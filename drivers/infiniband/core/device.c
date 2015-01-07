@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/mutex.h>
 #include <rdma/rdma_netlink.h>
+#include <rdma/ib_addr.h>
 
 #include "core_priv.h"
 
