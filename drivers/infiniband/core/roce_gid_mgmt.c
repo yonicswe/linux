@@ -67,11 +67,18 @@ struct netdev_event_work {
 	struct net_device		*ndev;
 };
 
+unsigned long roce_gid_type_mask_support(struct ib_device *ib_dev, u8 port)
+{
+	return !!rdma_protocol_roce(ib_dev, port);
+}
+
 static void update_gid(enum gid_op_type gid_op, struct ib_device *ib_dev,
 		       u8 port, union ib_gid *gid,
 		       struct ib_gid_attr *gid_attr)
 {
-	if (rdma_protocol_roce(ib_dev, port)) {
+	unsigned long gid_type_mask = roce_gid_type_mask_support(ib_dev, port);
+
+	if (gid_type_mask) {
 		switch (gid_op) {
 		case GID_ADD:
 			roce_add_gid(ib_dev, port,
@@ -122,6 +129,21 @@ static void update_gid_ip(enum gid_op_type gid_op,
 	gid_attr.ndev = ndev;
 
 	update_gid(gid_op, ib_dev, port, &gid, &gid_attr);
+}
+
+static void enum_netdev_default_gids(struct ib_device *ib_dev,
+				     u8 port, struct net_device *ndev,
+				     struct net_device *idev)
+{
+	unsigned long gid_type_mask;
+
+	if (idev != ndev)
+		return;
+
+	gid_type_mask = roce_gid_type_mask_support(ib_dev, port);
+
+	roce_gid_table_set_default_gid(ib_dev, port, idev, gid_type_mask,
+				       ROCE_GID_TABLE_DEFAULT_MODE_SET);
 }
 
 static void enum_netdev_ipv4_ips(struct ib_device *ib_dev,
@@ -204,6 +226,7 @@ static void add_netdev_ips(struct ib_device *ib_dev, u8 port,
 {
 	struct net_device *ndev = (struct net_device *)cookie;
 
+	enum_netdev_default_gids(ib_dev, port, ndev, idev);
 	enum_netdev_ipv4_ips(ib_dev, port, ndev);
 #if IS_ENABLED(CONFIG_IPV6)
 	enum_netdev_ipv6_ips(ib_dev, port, ndev);
