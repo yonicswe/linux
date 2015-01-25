@@ -452,7 +452,8 @@ static void set_roce_gid_cache_active(struct ib_roce_gid_cache *cache, int activ
 
 void roce_gid_cache_set_default_gid(struct ib_device *ib_dev, u8 port,
 				    struct net_device *ndev,
-				    unsigned long gid_type_mask)
+				    unsigned long gid_type_mask,
+				    enum roce_gid_cache_default_mode mode)
 {
 	union ib_gid gid;
 	struct ib_gid_attr gid_attr;
@@ -480,21 +481,26 @@ void roce_gid_cache_set_default_gid(struct ib_device *ib_dev, u8 port,
 		if (!roce_gid_cache_get_gid(ib_dev, port, success, &current_gid,
 					    &current_gid_attr) &&
 		    !memcmp(&gid, &current_gid, sizeof(gid)) &&
-		    !memcmp(&gid_attr, &current_gid_attr, sizeof(gid_attr)))
+		    !memcmp(&gid_attr, &current_gid_attr, sizeof(gid_attr)) &&
+		    mode == ROCE_GID_CACHE_DEFAULT_MODE_SET)
 			continue;
 
 		mutex_lock(&cache->lock);
 		if (write_gid(ib_dev, port, cache, success, &zgid, &zattr)) {
 			pr_warn("roce_gid_cache: can't delete index %d for default gid %pI6\n",
 				success, gid.raw);
+			mutex_unlock(&cache->lock);
 			success++;
-		} else if (write_gid(ib_dev, port, cache, success, &gid, &gid_attr)) {
+			continue;
+		}
+
+		if (mode == ROCE_GID_CACHE_DEFAULT_MODE_SET &&
+		    write_gid(ib_dev, port, cache, success, &gid, &gid_attr))
 			pr_warn("roce_gid_cache: unable to add default gid %pI6\n",
 				gid.raw);
-		} else {
-			success++;
-		}
+
 		mutex_unlock(&cache->lock);
+		success++;
 	}
 }
 
