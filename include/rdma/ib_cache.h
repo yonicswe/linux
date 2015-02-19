@@ -113,7 +113,7 @@ int ib_find_cached_gid_by_port(struct ib_device *device,
 			       u16              *index);
 
 /**
- * ib_find_cached_gid_by_port - Returns the GID table index where a specified
+ * ib_find_gid_by_filter - Returns the GID table index where a specified
  * GID value occurs
  * @device: The device to query.
  * @gid: The GID value to search for.
@@ -128,7 +128,7 @@ int ib_find_cached_gid_by_port(struct ib_device *device,
  * @index: The index into the cached GID table where the GID was found.  This
  *   parameter may be NULL.
  *
- * ib_find_cached_gid_by_port() searches for the specified GID value in
+ * ib_find_gid_by_filter() searches for the specified GID value in
  * the local software cache.
  */
 int ib_find_gid_by_filter(struct ib_device *device,
