@@ -730,7 +730,6 @@ static int add_port(struct ib_device *device, int port_num,
 
 	list_add_tail(&p->kobj.entry, &device->port_list);
 
-	kobject_uevent(&p->gid_attr_group->kobj, KOBJ_ADD);
 	kobject_uevent(&p->kobj, KOBJ_ADD);
 	return 0;
 
