@@ -473,7 +473,7 @@ int roce_gid_cache_find_gid_by_filter(struct ib_device *ib_dev,
 
 	cache = ib_dev->cache.roce_gid_cache[port - start_port(ib_dev)];
 
-	if (!cache->active)
+	if (!cache || !cache->active)
 		return -ENOENT;
 
 	for (i = 0; i < cache->sz; i++) {
