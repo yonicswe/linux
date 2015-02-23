@@ -62,6 +62,7 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 	struct ocrdma_grh grh;
 	int eth_sz;
 	u16 proto_num = 0;
+	u8 nxthdr = 0x11;
 	struct iphdr ipv4;
 	union {
 		struct sockaddr     _sockaddr;
@@ -73,7 +74,7 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 	memset(&grh, 0, sizeof(grh));
 	/* Protocol Number */
 	proto_num = ocrdma_hdr_type_to_proto_num(ah->hdr_type);
-
+	nxthdr = (proto_num == 0x8915) ? 0x1b : 0x11;
 
 	/* VLAN */
 	if (!vlan_tag || (vlan_tag > 0xFFF))
@@ -104,7 +105,7 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 		ipv4.frag_off = htons(IP_DF);
 		ipv4.tot_len = htons(0);
 		ipv4.ttl = attr->grh.hop_limit;
-		ipv4.protocol = 0x11;
+		ipv4.protocol = nxthdr;
 		rdma_gid2ip(&sgid_addr._sockaddr, sgid);
 		ipv4.saddr = sgid_addr._sockaddr_in.sin_addr.s_addr;
 		rdma_gid2ip(&dgid_addr._sockaddr, &attr->grh.dgid);
@@ -119,7 +120,7 @@ static inline int set_av_attr(struct ocrdma_dev *dev, struct ocrdma_ah *ah,
 		       sizeof(attr->grh.dgid.raw));
 		/* 0x1b is next header value in GRH */
 		grh.pdid_hoplimit = cpu_to_be32((pdid << 16) |
-						(0x11 << 8) |
+						(nxthdr << 8) |
 						attr->grh.hop_limit);
 		memcpy((u8 *)ah->av + eth_sz, &grh, sizeof(struct ocrdma_grh));
 	}
