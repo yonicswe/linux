@@ -277,7 +277,7 @@ void ib_unpack(const struct ib_field        *desc,
 	       void                         *buf,
 	       void                         *structure);
 
-u16 ib_ud_ip4_csum(struct ib_ud_header *header);
+__be16 ib_ud_ip4_csum(struct ib_ud_header *header);
 
 int ib_ud_header_init(int		    payload_bytes,
 		      int		    lrh_present,
