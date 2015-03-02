@@ -195,11 +195,11 @@ struct ib_ah *ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr)
 }
 EXPORT_SYMBOL(ib_create_ah);
 
-static int ib_get_grh_header_version(const void *h)
+static int ib_get_grh_header_version(const union rdma_network_hdr *h)
 {
-	const struct iphdr *ip4h = (struct iphdr *)(h + 20);
+	const struct iphdr *ip4h = (struct iphdr *)&h->roce4grh;
 	struct iphdr ip4h_checked;
-	const struct ipv6hdr *ip6h = (struct ipv6hdr *)h;
+	const struct ipv6hdr *ip6h = (struct ipv6hdr *)&h->ibgrh;
 
 	if (ip6h->version != 6)
 		return (ip4h->version == 4) ? 4 : 0;
@@ -228,7 +228,7 @@ static enum rdma_network_type ib_get_net_type_by_grh(struct ib_device *device,
 	if (rdma_port_get_link_layer(device, port_num) == IB_LINK_LAYER_INFINIBAND)
 		return RDMA_NETWORK_IB;
 
-	grh_version = ib_get_grh_header_version(grh);
+	grh_version = ib_get_grh_header_version((union rdma_network_hdr *)grh);
 
 	if (grh_version == 4)
 		return RDMA_NETWORK_IPV4;
@@ -274,10 +274,10 @@ static int get_sgid_index_from_eth(struct ib_device *device, u8 port_num,
 				     &context, gid_index);
 }
 
-static int get_gids_from_grh(struct ib_grh *grh, enum rdma_network_type net_type,
-			     union ib_gid *sgid, union ib_gid *dgid)
+static int get_gids_from_rdma_hdr(union rdma_network_hdr *hdr,
+				  enum rdma_network_type net_type,
+				  union ib_gid *sgid, union ib_gid *dgid)
 {
-	union rdma_network_hdr *l3grh;
 	struct sockaddr_in  src_in;
 	struct sockaddr_in  dst_in;
 	__be32 src_saddr, dst_saddr;
@@ -286,12 +286,10 @@ static int get_gids_from_grh(struct ib_grh *grh, enum rdma_network_type net_type
 		return -EINVAL;
 
 	if (net_type == RDMA_NETWORK_IPV4) {
-		l3grh = (union rdma_network_hdr *)
-			((u8 *)grh + 20);
 		memcpy(&src_in.sin_addr.s_addr,
-		       &l3grh->roce4grh.saddr, 4);
+		       &hdr->roce4grh.saddr, 4);
 		memcpy(&dst_in.sin_addr.s_addr,
-		       &l3grh->roce4grh.daddr, 4);
+		       &hdr->roce4grh.daddr, 4);
 		src_saddr = src_in.sin_addr.s_addr;
 		dst_saddr = dst_in.sin_addr.s_addr;
 		ipv6_addr_set_v4mapped(src_saddr,
@@ -301,8 +299,8 @@ static int get_gids_from_grh(struct ib_grh *grh, enum rdma_network_type net_type
 		return 0;
 	} else if (net_type == RDMA_NETWORK_IPV6 ||
 		   net_type == RDMA_NETWORK_IB) {
-		*dgid = grh->dgid;
-		*sgid = grh->sgid;
+		*dgid = hdr->ibgrh.dgid;
+		*sgid = hdr->ibgrh.sgid;
 		return 0;
 	} else
 		return -EINVAL;
@@ -329,7 +327,8 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num, struct ib_wc *wc,
 			net_type = ib_get_net_type_by_grh(device, port_num, grh);
 		gid_type = ib_network_to_gid_type(net_type);
 	}
-	ret = get_gids_from_grh(grh, net_type, &sgid, &dgid);
+	ret = get_gids_from_rdma_hdr((union rdma_network_hdr *)grh, net_type,
+				     &sgid, &dgid);
 	if (ret)
 		return ret;
 

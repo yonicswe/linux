@@ -519,7 +519,10 @@ struct ib_grh {
 
 union rdma_network_hdr {
 	struct ib_grh ibgrh;
-	struct iphdr roce4grh;
+	struct {
+		u8		reserved[20];
+		struct iphdr	roce4grh;
+	};
 };
 
 enum {
