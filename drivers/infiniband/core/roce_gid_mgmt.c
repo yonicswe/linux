@@ -56,7 +56,7 @@ struct  update_gid_event_work {
 	enum gid_op_type gid_op;
 };
 
-#define ROCE_NETDEV_CALLBACK_SZ		2
+#define ROCE_NETDEV_CALLBACK_SZ		3
 struct netdev_event_work_cmd {
 	roce_netdev_callback	cb;
 	roce_netdev_filter	filter;
@@ -133,9 +133,9 @@ static void update_gid(enum gid_op_type gid_op, struct ib_device *ib_dev,
 	  (IFF_BONDING | IFF_MASTER)) == (IFF_BONDING | IFF_MASTER))
 
 enum bonding_slave_state {
-	BONDING_SLAVE_STATE_ACTIVE,
-	BONDING_SLAVE_STATE_INACTIVE,
-	BONDING_SLAVE_STATE_NA
+	BONDING_SLAVE_STATE_ACTIVE	= 1UL << 0,
+	BONDING_SLAVE_STATE_INACTIVE	= 1UL << 1,
+	BONDING_SLAVE_STATE_NA		= 1UL << 2,
 };
 
 static enum bonding_slave_state is_eth_active_slave_of_bonding(struct net_device *idev,
@@ -155,8 +155,9 @@ static enum bonding_slave_state is_eth_active_slave_of_bonding(struct net_device
 	return BONDING_SLAVE_STATE_NA;
 }
 
-static int is_eth_port_of_netdev(struct ib_device *ib_dev, u8 port,
-				 struct net_device *idev, void *cookie)
+static int _is_eth_port_of_netdev(struct ib_device *ib_dev, u8 port,
+				  struct net_device *idev, void *cookie,
+				  unsigned long bond_state)
 {
 	struct net_device *rdev;
 	struct net_device *mdev;
@@ -174,11 +175,26 @@ static int is_eth_port_of_netdev(struct ib_device *ib_dev, u8 port,
 
 	res = (rdev == idev ||
 	       (rdev == mdev &&
-		is_eth_active_slave_of_bonding(idev, mdev) !=
-		BONDING_SLAVE_STATE_INACTIVE));
+		is_eth_active_slave_of_bonding(idev, mdev) &
+		bond_state));
 
 	rcu_read_unlock();
 	return res;
+}
+
+static int is_eth_port_of_netdev(struct ib_device *ib_dev, u8 port,
+				 struct net_device *idev, void *cookie)
+{
+	return _is_eth_port_of_netdev(ib_dev, port, idev, cookie,
+				      BONDING_SLAVE_STATE_ACTIVE |
+				      BONDING_SLAVE_STATE_NA);
+}
+
+static int is_eth_port_slave_of_netdev(struct ib_device *ib_dev, u8 port,
+				       struct net_device *idev, void *cookie)
+{
+	return _is_eth_port_of_netdev(ib_dev, port, idev, cookie,
+				      BONDING_SLAVE_STATE_INACTIVE);
 }
 
 static int pass_all_filter(struct ib_device *ib_dev, u8 port,
@@ -410,19 +426,6 @@ static void del_netdev_ips(struct ib_device *ib_dev, u8 port,
 	struct net_device *ndev = (struct net_device *)cookie;
 
 	roce_del_all_netdev_gids(ib_dev, port, ndev);
-	if (idev) {
-		bool is_upper;
-
-		rcu_read_lock();
-		is_upper = netdev_master_upper_dev_get_rcu(idev) == ndev;
-		rcu_read_unlock();
-
-		if (is_upper)
-			/* Delete default GIDs, vlans should be deleted
-			 * first by user
-			 */
-			roce_del_all_netdev_gids(ib_dev, port, idev);
-	}
 }
 
 static void del_netdev_default_ips(struct ib_device *ib_dev, u8 port,
@@ -441,7 +444,7 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 	static const struct netdev_event_work_cmd del_cmd = {
 		.cb = del_netdev_ips, .filter = pass_all_filter};
 	static const struct netdev_event_work_cmd bonding_default_del_cmd = {
-		.cb = del_netdev_default_ips, .filter = bonding_slaves_filter};
+		.cb = del_netdev_default_ips, .filter = is_eth_port_slave_of_netdev};
 	static const struct netdev_event_work_cmd bonding_ips_del_cmd = {
 		.cb = del_netdev_ips, .filter = bonding_slaves_filter};
 	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
@@ -472,7 +475,8 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 
 	case NETDEV_BONDING_FAILOVER:
 		cmds[0] = bonding_ips_del_cmd;
-		cmds[1] = add_cmd;
+		cmds[1] = bonding_default_del_cmd;
+		cmds[2] = add_cmd;
 		break;
 	case NETDEV_JOIN:
 		cmds[0] = bonding_default_del_cmd;
