@@ -186,7 +186,6 @@ struct rdma_id_private {
 	u8			reuseaddr;
 	u8			afonly;
 	enum ib_gid_type	gid_type;
-	bool			igmp_joined;
 };
 
 struct cma_multicast {
@@ -198,6 +197,7 @@ struct cma_multicast {
 	void			*context;
 	struct sockaddr_storage	addr;
 	struct kref		mcref;
+	bool			igmp_joined;
 };
 
 struct cma_work {
@@ -607,7 +607,6 @@ struct rdma_cm_id *rdma_create_id(rdma_cm_event_handler event_handler,
 	INIT_LIST_HEAD(&id_priv->listen_list);
 	INIT_LIST_HEAD(&id_priv->mc_list);
 	get_random_bytes(&id_priv->seq_num, sizeof id_priv->seq_num);
-	id_priv->igmp_joined = false;
 
 	return &id_priv->id;
 }
@@ -1099,7 +1098,7 @@ static void cma_leave_mc_groups(struct rdma_id_private *id_priv)
 			kfree(mc);
 			break;
 		case IB_LINK_LAYER_ETHERNET:
-			if (id_priv->igmp_joined) {
+			if (mc->igmp_joined) {
 				struct rdma_dev_addr *dev_addr = &id_priv->id.route.addr.dev_addr;
 				struct net_device *ndev = NULL;
 
@@ -3425,24 +3424,23 @@ static int cma_iboe_join_multicast(struct rdma_id_private *id_priv,
 	mc->multicast.ib->rec.rate = iboe_get_rate(ndev);
 	mc->multicast.ib->rec.hop_limit = 1;
 	mc->multicast.ib->rec.mtu = iboe_get_mtu(ndev->mtu);
+	mc->multicast.ib->rec.ifindex = dev_addr->bound_dev_if;
+	mc->multicast.ib->rec.net = &init_net;
 	rdma_ip2gid((struct sockaddr *)&id_priv->id.route.addr.src_addr,
 		    &mc->multicast.ib->rec.port_gid);
 
 	if (addr->sa_family == AF_INET) {
-		u16 sgid_index;
-
-		err = ib_find_cached_gid_by_port(id_priv->cma_dev->device,
-						 &mc->multicast.ib->rec.port_gid,
-						 IB_GID_TYPE_ROCE_V2,
-						 id_priv->id.port_num,
-						 &init_net, dev_addr->bound_dev_if,
-						 &sgid_index);
-		if (!err)
-			err = cma_igmp_send(ndev, &mc->multicast.ib->rec.mgid, true);
+		mc->multicast.ib->rec.gid_type =
+			id_priv->cma_dev->default_gid_type;
+		if (mc->multicast.ib->rec.gid_type == IB_GID_TYPE_ROCE_V2)
+			err = cma_igmp_send(ndev, &mc->multicast.ib->rec.mgid,
+					    true);
 		if (!err) {
-			id_priv->igmp_joined = true;
+			mc->igmp_joined = true;
 			mc->multicast.ib->rec.hop_limit = IPV6_DEFAULT_HOPLIMIT;
 		}
+	} else {
+		mc->multicast.ib->rec.gid_type = IB_GID_TYPE_IB;
 	}
 	dev_put(ndev);
 	if (err || !mc->multicast.ib->rec.mtu) {
@@ -3484,7 +3482,7 @@ int rdma_join_multicast(struct rdma_cm_id *id, struct sockaddr *addr,
 	memcpy(&mc->addr, addr, rdma_addr_size(addr));
 	mc->context = context;
 	mc->id_priv = id_priv;
-
+	mc->igmp_joined = false;
 	spin_lock(&id_priv->lock);
 	list_add(&mc->list, &id_priv->mc_list);
 	spin_unlock(&id_priv->lock);
@@ -3541,7 +3539,7 @@ void rdma_leave_multicast(struct rdma_cm_id *id, struct sockaddr *addr)
 					kfree(mc);
 					break;
 				case IB_LINK_LAYER_ETHERNET:
-					if (id_priv->igmp_joined) {
+					if (mc->igmp_joined) {
 						struct rdma_dev_addr *dev_addr = &id->route.addr.dev_addr;
 						struct net_device *ndev = NULL;
 
@@ -3554,7 +3552,7 @@ void rdma_leave_multicast(struct rdma_cm_id *id, struct sockaddr *addr)
 								      false);
 							dev_put(ndev);
 						}
-						id_priv->igmp_joined = false;
+						mc->igmp_joined = false;
 					}
 					kref_put(&mc->mcref, release_mc);
 					break;
