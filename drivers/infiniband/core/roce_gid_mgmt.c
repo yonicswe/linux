@@ -461,6 +461,7 @@ static void del_netdev_upper_ips(struct ib_device *ib_dev, u8 port,
 					 list) {
 			roce_del_all_netdev_gids(ib_dev, port,
 						 upper_iter->upper);
+			dev_put(upper_iter->upper);
 			list_del(&upper_iter->list);
 			kfree(upper_iter);
 		}
@@ -518,6 +519,7 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 	case NETDEV_CHANGEUPPER:
 		cmds[0] = upper_ips_del_cmd;
 		cmds[1] = add_cmd;
+	break;
 
 	case NETDEV_BONDING_FAILOVER:
 		cmds[0] = bonding_event_ips_del_cmd;
