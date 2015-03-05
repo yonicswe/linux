@@ -3819,7 +3819,9 @@ static int __init cma_init(void)
 
 	if (ibnl_add_client(RDMA_NL_RDMA_CM, RDMA_NL_RDMA_CM_NUM_OPS, cma_cb_table))
 		printk(KERN_WARNING "RDMA CMA: failed to add netlink callback\n");
+#ifdef CONFIG_CONFIGFS_FS
 	cma_configfs_init();
+#endif
 
 	return 0;
 
@@ -3833,7 +3835,9 @@ err:
 
 static void __exit cma_cleanup(void)
 {
+#ifdef CONFIG_CONFIGFS_FS
 	cma_configfs_exit();
+#endif
 	ibnl_remove_client(RDMA_NL_RDMA_CM);
 	ib_unregister_client(&cma_client);
 	unregister_netdevice_notifier(&cma_nb);

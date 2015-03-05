@@ -22,7 +22,9 @@ ib_cm-y :=			cm.o
 
 iw_cm-y :=			iwcm.o iwpm_util.o iwpm_msg.o
 
-rdma_cm-y :=			cma.o cma_configfs.o
+rdma_cm-y :=			cma.o
+
+rdma_cm-$(CONFIG_CONFIGFS_FS) += cma_configfs.o
 
 rdma_ucm-y :=			ucma.o
 
