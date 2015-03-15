@@ -60,12 +60,13 @@ struct  update_gid_event_work {
 struct netdev_event_work_cmd {
 	roce_netdev_callback	cb;
 	roce_netdev_filter	filter;
+	struct net_device	*ndev;
+	struct net_device	*f_ndev;
 };
 
 struct netdev_event_work {
 	struct work_struct		work;
 	struct netdev_event_work_cmd	cmds[ROCE_NETDEV_CALLBACK_SZ];
-	struct net_device		*ndev;
 };
 
 struct roce_rescan_work {
@@ -226,6 +227,14 @@ static int pass_all_filter(struct ib_device *ib_dev, u8 port,
 	return 1;
 }
 
+static int upper_device_filter(struct ib_device *ib_dev, u8 port,
+			       struct net_device *idev, void *cookie)
+{
+	struct net_device *ndev = (struct net_device *)cookie;
+
+	return idev == ndev || is_upper_dev_rcu(idev, ndev);
+}
+
 static int bonding_slaves_filter(struct ib_device *ib_dev, u8 port,
 				 struct net_device *idev, void *cookie)
 {
@@ -252,11 +261,15 @@ static void netdevice_event_work_handler(struct work_struct *_work)
 		container_of(_work, struct netdev_event_work, work);
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(work->cmds) && work->cmds[i].cb; i++)
-		ib_enum_roce_ports_of_netdev(work->cmds[i].filter, work->ndev,
-					     work->cmds[i].cb, work->ndev);
+	for (i = 0; i < ARRAY_SIZE(work->cmds) && work->cmds[i].cb; i++) {
+		ib_enum_roce_ports_of_netdev(work->cmds[i].filter,
+					     work->cmds[i].f_ndev,
+					     work->cmds[i].cb,
+					     work->cmds[i].ndev);
+		dev_put(work->cmds[i].ndev);
+		dev_put(work->cmds[i].f_ndev);
+	}
 
-	dev_put(work->ndev);
 	kfree(work);
 }
 
@@ -280,15 +293,12 @@ static void enum_netdev_default_gids(struct ib_device *ib_dev,
 				     struct net_device *idev)
 {
 	unsigned long gid_type_mask;
-	struct net_device *rdev = rdma_vlan_dev_real_dev(ndev);
-
-	if (!rdev)
-		rdev = ndev;
 
 	rcu_read_lock();
 	if (!idev ||
 	    ((idev != ndev && !is_upper_dev_rcu(idev, ndev)) ||
-	     is_eth_active_slave_of_bonding(idev, rdev) ==
+	     is_eth_active_slave_of_bonding(idev,
+					    netdev_master_upper_dev_get_rcu(idev)) ==
 	     BONDING_SLAVE_STATE_INACTIVE)) {
 		rcu_read_unlock();
 		return;
@@ -431,46 +441,57 @@ static void del_netdev_upper_ips(struct ib_device *ib_dev, u8 port,
 				 struct net_device *idev, void *cookie)
 {
 	struct net_device *ndev = (struct net_device *)cookie;
-	struct net_device *rdev = rdma_vlan_dev_real_dev(ndev);
-
-	if (!rdev)
-		rdev = ndev;
-
-	if (idev == rdev) {
-		struct upper_list {
-			struct list_head list;
-			struct net_device *upper;
-		};
+	struct upper_list {
+		struct list_head list;
 		struct net_device *upper;
-		struct list_head *iter;
-		struct upper_list *upper_iter;
-		struct upper_list *upper_temp;
-		LIST_HEAD(upper_list);
+	};
+	struct net_device *upper;
+	struct list_head *iter;
+	struct upper_list *upper_iter;
+	struct upper_list *upper_temp;
+	LIST_HEAD(upper_list);
 
-		rcu_read_lock();
-		netdev_for_each_all_upper_dev_rcu(idev, upper, iter) {
-			struct upper_list *entry = kmalloc(sizeof(*entry),
-							   GFP_ATOMIC);
+	rcu_read_lock();
+	netdev_for_each_all_upper_dev_rcu(ndev, upper, iter) {
+		struct upper_list *entry = kmalloc(sizeof(*entry),
+						   GFP_ATOMIC);
 
-			if (!entry) {
-				pr_info("roce_gid_mgmt: couldn't allocate entry to delete ndev\n");
-				continue;
-			}
-
-			list_add_tail(&entry->list, &upper_list);
-			dev_hold(upper);
-			entry->upper = upper;
+		if (!entry) {
+			pr_info("roce_gid_mgmt: couldn't allocate entry to delete ndev\n");
+			continue;
 		}
-		rcu_read_unlock();
 
-		list_for_each_entry_safe(upper_iter, upper_temp, &upper_list,
-					 list) {
-			roce_del_all_netdev_gids(ib_dev, port,
-						 upper_iter->upper);
-			dev_put(upper_iter->upper);
-			list_del(&upper_iter->list);
-			kfree(upper_iter);
-		}
+		list_add_tail(&entry->list, &upper_list);
+		dev_hold(upper);
+		entry->upper = upper;
+	}
+	rcu_read_unlock();
+
+	roce_del_all_netdev_gids(ib_dev, port, ndev);
+	list_for_each_entry_safe(upper_iter, upper_temp, &upper_list,
+				 list) {
+		roce_del_all_netdev_gids(ib_dev, port,
+					 upper_iter->upper);
+		dev_put(upper_iter->upper);
+		list_del(&upper_iter->list);
+		kfree(upper_iter);
+	}
+}
+
+static void del_netdev_default_ips_join(struct ib_device *ib_dev, u8 port,
+					struct net_device *idev, void *cookie)
+{
+	struct net_device *mdev;
+
+	rcu_read_lock();
+	mdev = netdev_master_upper_dev_get_rcu(idev);
+	if (mdev)
+		dev_hold(mdev);
+	rcu_read_unlock();
+
+	if (mdev) {
+		bond_delete_netdev_default_gids(ib_dev, port, mdev, idev);
+		dev_put(mdev);
 	}
 }
 
@@ -489,15 +510,20 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 		.cb = add_netdev_ips, .filter = is_eth_port_of_netdev};
 	static const struct netdev_event_work_cmd del_cmd = {
 		.cb = del_netdev_ips, .filter = pass_all_filter};
+	static const struct netdev_event_work_cmd bonding_default_del_cmd_join = {
+		.cb = del_netdev_default_ips_join, .filter = is_eth_port_inactive_slave};
 	static const struct netdev_event_work_cmd bonding_default_del_cmd = {
 		.cb = del_netdev_default_ips, .filter = is_eth_port_inactive_slave};
+	static const struct netdev_event_work_cmd default_del_cmd = {
+		.cb = del_netdev_default_ips, .filter = pass_all_filter};
 	static const struct netdev_event_work_cmd bonding_event_ips_del_cmd = {
 		.cb = del_netdev_ips, .filter = bonding_slaves_filter};
 	static const struct netdev_event_work_cmd upper_ips_del_cmd = {
-		.cb = del_netdev_upper_ips, .filter = pass_all_filter};
+		.cb = del_netdev_upper_ips, .filter = upper_device_filter};
 	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
 	struct netdev_event_work *ndev_work;
 	struct netdev_event_work_cmd cmds[ROCE_NETDEV_CALLBACK_SZ] = { {NULL} };
+	unsigned int i;
 
 	if (ndev->type != ARPHRD_ETHER)
 		return NOTIFY_DONE;
@@ -505,8 +531,7 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 	switch (event) {
 	case NETDEV_REGISTER:
 	case NETDEV_UP:
-	case NETDEV_JOIN:
-		cmds[0] = bonding_default_del_cmd;
+		cmds[0] = bonding_default_del_cmd_join;
 		cmds[1] = add_cmd;
 		break;
 
@@ -518,18 +543,34 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 		break;
 
 	case NETDEV_CHANGEADDR:
-		cmds[0] = del_cmd;
+		cmds[0] = default_del_cmd;
 		cmds[1] = add_cmd;
 		break;
 
 	case NETDEV_CHANGEUPPER:
-		cmds[0] = upper_ips_del_cmd;
-		cmds[1] = add_cmd;
+		{
+			struct netdev_changeupper_info *changeupper_info =
+				container_of(ptr, struct netdev_changeupper_info, info);
+
+			if (changeupper_info->event ==
+			    NETDEV_CHANGEUPPER_UNLINK) {
+				cmds[0] = upper_ips_del_cmd;
+				cmds[0].ndev = changeupper_info->upper;
+				cmds[1] = add_cmd;
+			} else if (changeupper_info->event ==
+				   NETDEV_CHANGEUPPER_LINK) {
+				cmds[0] = bonding_default_del_cmd;
+				cmds[0].ndev = changeupper_info->upper;
+				cmds[1] = add_cmd;
+				cmds[1].ndev = changeupper_info->upper;
+				cmds[1].f_ndev = changeupper_info->upper;
+			}
+		}
 	break;
 
 	case NETDEV_BONDING_FAILOVER:
 		cmds[0] = bonding_event_ips_del_cmd;
-		cmds[1] = bonding_default_del_cmd;
+		cmds[1] = bonding_default_del_cmd_join;
 		cmds[2] = add_cmd;
 		break;
 
@@ -544,8 +585,14 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
 	}
 
 	memcpy(ndev_work->cmds, cmds, sizeof(ndev_work->cmds));
-	ndev_work->ndev = ndev;
-	dev_hold(ndev);
+	for (i = 0; i < ARRAY_SIZE(ndev_work->cmds) && ndev_work->cmds[i].cb; i++) {
+		if (!ndev_work->cmds[i].ndev)
+			ndev_work->cmds[i].ndev = ndev;
+		if (!ndev_work->cmds[i].f_ndev)
+			ndev_work->cmds[i].f_ndev = ndev;
+		dev_hold(ndev_work->cmds[i].ndev);
+		dev_hold(ndev_work->cmds[i].f_ndev);
+	}
 	INIT_WORK(&ndev_work->work, netdevice_event_work_handler);
 
 	queue_work(roce_gid_mgmt_wq, &ndev_work->work);
