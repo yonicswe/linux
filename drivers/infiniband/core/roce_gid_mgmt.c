@@ -83,7 +83,7 @@ static const struct {
 
 #define CAP_TO_GID_TABLE_SIZE	ARRAY_SIZE(PORT_CAP_TO_GID_TYPE)
 
-static unsigned long gid_type_mask_support(struct ib_device *ib_dev, u8 port)
+unsigned long roce_gid_type_mask_support(struct ib_device *ib_dev, u8 port)
 {
 	struct ib_port_attr pattr;
 	int i;
@@ -109,7 +109,7 @@ static void update_gid(enum gid_op_type gid_op, struct ib_device *ib_dev,
 		       struct ib_gid_attr *gid_attr)
 {
 	int i;
-	unsigned long gid_type_mask = gid_type_mask_support(ib_dev, port);
+	unsigned long gid_type_mask = roce_gid_type_mask_support(ib_dev, port);
 
 	for (i = 0; i < IB_GID_TYPE_SIZE; i++) {
 		if ((1UL << i) & gid_type_mask) {
@@ -295,7 +295,7 @@ static void enum_netdev_default_gids(struct ib_device *ib_dev,
 	}
 	rcu_read_unlock();
 
-	gid_type_mask = gid_type_mask_support(ib_dev, port);
+	gid_type_mask = roce_gid_type_mask_support(ib_dev, port);
 
 	roce_gid_cache_set_default_gid(ib_dev, port, idev, gid_type_mask,
 				       ROCE_GID_CACHE_DEFAULT_MODE_SET);
@@ -322,7 +322,7 @@ static void bond_delete_netdev_default_gids(struct ib_device *ib_dev,
 
 		rcu_read_unlock();
 
-		gid_type_mask = gid_type_mask_support(ib_dev, port);
+		gid_type_mask = roce_gid_type_mask_support(ib_dev, port);
 
 		roce_gid_cache_set_default_gid(ib_dev, port, idev,
 					       gid_type_mask,
