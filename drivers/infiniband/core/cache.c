@@ -82,6 +82,8 @@ static int __IB_ONLY __ib_get_cached_gid(struct ib_device *device,
 
 	if (!device->cache.gid_cache)
 		return -EINVAL;
+	if (port_num < start_port(device) || port_num > end_port(device))
+		return -EINVAL;
 
 	read_lock_irqsave(&device->cache.lock, flags);
 
@@ -150,6 +152,8 @@ static int __IB_ONLY ___ib_find_cached_gid_by_port(struct ib_device *device,
 	u8 p = port_num - start_port(device);
 	int i;
 
+	if (port_num < start_port(device) || port_num > end_port(device))
+		return -EINVAL;
 	if (!ib_cache_use_roce_gid_cache(device, port_num))
 		return -ENOSYS;
 
@@ -426,6 +430,9 @@ static void ib_cache_update(struct ib_device *device,
 	bool			   use_roce_gid_cache =
 					!ib_cache_use_roce_gid_cache(device,
 								     port);
+
+	if (port < start_port(device) || port > end_port(device))
+		return;
 
 	tprops = kmalloc(sizeof *tprops, GFP_KERNEL);
 	if (!tprops)
