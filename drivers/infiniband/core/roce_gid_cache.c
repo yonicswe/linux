@@ -148,7 +148,7 @@ static int write_gid(struct ib_device *ib_dev, u8 port,
 
 	if (++orig_seq == (unsigned int)-1)
 		orig_seq = 0;
-	ACCESS_ONCE(cache->data_vec[ix].seq) = orig_seq;
+	WRITE_ONCE(cache->data_vec[ix].seq, orig_seq);
 
 	if (!ret) {
 		struct ib_event event;
@@ -175,7 +175,7 @@ static int find_gid(struct ib_roce_gid_cache *cache, union ib_gid *gid,
 		orig_seq = cache->data_vec[i].seq;
 		if (orig_seq == -1)
 			continue;
-		/* Make sure the sequence number we remeber was read
+		/* Make sure the sequence number we remember was read
 		 * before the gid cache entry content is read.
 		 */
 		smp_rmb();
@@ -202,7 +202,7 @@ static int find_gid(struct ib_roce_gid_cache *cache, union ib_gid *gid,
 		 * read.
 		 */
 		smp_rmb();
-		if (orig_seq == ACCESS_ONCE(cache->data_vec[i].seq))
+		if (orig_seq == READ_ONCE(cache->data_vec[i].seq))
 			return i;
 		/* The sequence number changed under our feet,
 		 * the GID entry is invalid. Continue to the
@@ -358,7 +358,7 @@ int roce_gid_cache_get_gid(struct ib_device *ib_dev, u8 port, int index,
 	if (index < 0 || index >= cache->sz)
 		return -EINVAL;
 
-	orig_seq = ACCESS_ONCE(cache->data_vec[index].seq);
+	orig_seq = READ_ONCE(cache->data_vec[index].seq);
 	/* Make sure we read the sequence number before copying the
 	 * gid to local storage. */
 	smp_rmb();
@@ -370,7 +370,7 @@ int roce_gid_cache_get_gid(struct ib_device *ib_dev, u8 port, int index,
 	smp_rmb();
 
 	if (orig_seq == -1 ||
-	    orig_seq != ACCESS_ONCE(cache->data_vec[index].seq))
+	    orig_seq != READ_ONCE(cache->data_vec[index].seq))
 		return -EAGAIN;
 
 	memcpy(gid, &local_gid, sizeof(*gid));
@@ -516,7 +516,7 @@ int roce_gid_cache_find_gid_by_filter(struct ib_device *ib_dev,
 
 		/* Make sure we finished reading the attribute */
 		smp_rmb();
-		if (orig_seq == ACCESS_ONCE(cache->data_vec[i].seq))
+		if (orig_seq == READ_ONCE(cache->data_vec[i].seq))
 			if (!filter || filter(gid, &attr, context))
 				found = true;
 
@@ -568,8 +568,8 @@ static void free_roce_gid_cache(struct ib_device *ib_dev, u8 port)
 	for (i = 0; i < cache->sz; ++i) {
 		if (memcmp(&cache->data_vec[i].gid, &zgid,
 			   sizeof(cache->data_vec[i].gid)))
-		    write_gid(ib_dev, port, cache, i, &zgid, &zattr,
-			      cache->data_vec[i].default_gid);
+			write_gid(ib_dev, port, cache, i, &zgid, &zattr,
+				  cache->data_vec[i].default_gid);
 	}
 	kfree(cache->data_vec);
 	kfree(cache);
