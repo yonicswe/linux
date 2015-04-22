@@ -3432,7 +3432,7 @@ static int cma_iboe_join_multicast(struct rdma_id_private *id_priv,
 	if (addr->sa_family == AF_INET) {
 		mc->multicast.ib->rec.gid_type =
 			id_priv->cma_dev->default_gid_type;
-		if (mc->multicast.ib->rec.gid_type == IB_GID_TYPE_ROCE_V2)
+		if (mc->multicast.ib->rec.gid_type == IB_GID_TYPE_IBOE_V2)
 			err = cma_igmp_send(ndev, &mc->multicast.ib->rec.mgid,
 					    true);
 		if (!err) {
