@@ -78,8 +78,8 @@ static const struct {
 	int flag_mask;
 	enum ib_gid_type gid_type;
 } PORT_CAP_TO_GID_TYPE[] = {
-	{IB_PORT_ROCE_V2,   IB_GID_TYPE_ROCE_V2},
-	{IB_PORT_ROCE,      IB_GID_TYPE_IB},
+	{IB_PORT_IBOE_V2,   IB_GID_TYPE_IBOE_V2},
+	{IB_PORT_IBOE_V1,   IB_GID_TYPE_IBOE_V1},
 };
 
 #define CAP_TO_GID_TABLE_SIZE	ARRAY_SIZE(PORT_CAP_TO_GID_TYPE)
