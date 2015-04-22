@@ -363,9 +363,9 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 	props->port_cap_flags	= IB_PORT_CM_SUP | IB_PORT_IP_BASED_GIDS;
 
 	if (mdev->dev->caps.flags & MLX4_DEV_CAP_FLAG_IBOE)
-		props->port_cap_flags	|= IB_PORT_ROCE;
+		props->port_cap_flags	|= IB_PORT_IBOE_V1;
 	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_ROCE_V1_V2)
-		props->port_cap_flags	|= IB_PORT_ROCE_V2 | IB_PORT_ROCE;
+		props->port_cap_flags	|= IB_PORT_IBOE_V2 | IB_PORT_IBOE_V1;
 
 	props->gid_tbl_len	= mdev->dev->caps.gid_table_len[port];
 	props->max_msg_sz	= mdev->dev->caps.max_msg_sz;
