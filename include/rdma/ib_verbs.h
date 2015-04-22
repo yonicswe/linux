@@ -131,7 +131,7 @@ static inline enum ib_gid_type ib_network_to_gid_type(enum rdma_network_type net
 {
 	if (network_type == RDMA_NETWORK_IPV4 ||
 	    network_type == RDMA_NETWORK_IPV6)
-		return IB_GID_TYPE_ROCE_V2;
+		return IB_GID_TYPE_IBOE_V2;
 
 	return IB_GID_TYPE_IB;
 }
