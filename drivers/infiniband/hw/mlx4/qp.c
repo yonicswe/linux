@@ -1499,9 +1499,9 @@ enum {
 static u8 gid_type_to_qpc(enum ib_gid_type gid_type)
 {
 	switch (gid_type) {
-	case IB_GID_TYPE_IB:
+	case IB_GID_TYPE_IBOE_V1:
 		return MLX4_QPC_ROCE_MODE_1;
-	case IB_GID_TYPE_ROCE_V2:
+	case IB_GID_TYPE_IBOE_V2:
 		return MLX4_QPC_ROCE_MODE_2;
 	default:
 		return MLX4_QPC_ROCE_MODE_MAX;
@@ -1665,7 +1665,7 @@ static int __mlx4_ib_modify_qp(struct ib_qp *ibqp,
 				  port_num, vlan, smac))
 			goto out;
 
-		if (is_eth && gid_attr.gid_type == IB_GID_TYPE_ROCE_V2)
+		if (is_eth && gid_attr.gid_type == IB_GID_TYPE_IBOE_V2)
 			context->pri_path.hop_limit = IPV6_DEFAULT_HOPLIMIT;
 
 		optpar |= (MLX4_QP_OPTPAR_PRIMARY_ADDR_PATH |
