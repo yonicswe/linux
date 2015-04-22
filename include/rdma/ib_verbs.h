@@ -72,7 +72,8 @@ extern union ib_gid zgid;
 enum ib_gid_type {
 	/* If link layer is Ethernet, this is RoCE V1 */
 	IB_GID_TYPE_IB        = 0,
-	IB_GID_TYPE_ROCE_V2   = 1,
+	IB_GID_TYPE_IBOE_V1   = 0,
+	IB_GID_TYPE_IBOE_V2   = 1,
 	IB_GID_TYPE_SIZE
 };
 
@@ -329,8 +330,8 @@ enum ib_port_cap_flags {
 	IB_PORT_LINK_LATENCY_SUP		= 1 << 24,
 	IB_PORT_CLIENT_REG_SUP			= 1 << 25,
 	IB_PORT_IP_BASED_GIDS			= 1 << 26,
-	IB_PORT_ROCE				= 1 << 27,
-	IB_PORT_ROCE_V2				= 1 << 28,
+	IB_PORT_IBOE_V1				= 1 << 27,
+	IB_PORT_IBOE_V2				= 1 << 28,
 };
 
 enum ib_port_width {
