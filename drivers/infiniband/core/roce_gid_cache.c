@@ -51,8 +51,8 @@ enum gid_attr_find_mask {
 };
 
 static const char * const gid_type_str[] = {
-	[IB_GID_TYPE_IB]	= "IB/RoCE V1\n",
-	[IB_GID_TYPE_ROCE_V2]	= "RoCE V2\n",
+	[IB_GID_TYPE_IB]	= "IB/IBOE V1\n",
+	[IB_GID_TYPE_IBOE_V2]	= "IBOE V2\n",
 };
 
 static inline int start_port(struct ib_device *ib_dev)
