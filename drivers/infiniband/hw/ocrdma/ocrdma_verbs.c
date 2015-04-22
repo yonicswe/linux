@@ -201,9 +201,9 @@ int ocrdma_query_port(struct ib_device *ibdev,
 	    IB_PORT_CM_SUP |
 	    IB_PORT_REINIT_SUP |
 	    IB_PORT_DEVICE_MGMT_SUP | IB_PORT_VENDOR_CLASS_SUP |
-	    IB_PORT_IP_BASED_GIDS | IB_PORT_ROCE;
+	    IB_PORT_IP_BASED_GIDS | IB_PORT_IBOE_V1;
 	if (ocrdma_is_rocev2_supported(dev))
-		props->port_cap_flags |= IB_PORT_ROCE_V2;
+		props->port_cap_flags |= IB_PORT_IBOE_V2;
 	props->gid_tbl_len = OCRDMA_MAX_SGID;
 	props->pkey_tbl_len = 1;
 	props->bad_pkey_cntr = 0;
