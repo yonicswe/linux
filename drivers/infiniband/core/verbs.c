@@ -1009,7 +1009,7 @@ int ib_resolve_eth_dmac(struct ib_qp *qp,
 				rcu_read_unlock();
 				goto out;
 			}
-			if (sgid_attr.gid_type == IB_GID_TYPE_ROCE_V2)
+			if (sgid_attr.gid_type == IB_GID_TYPE_IBOE_V2)
 				qp_attr->ah_attr.grh.hop_limit =
 							IPV6_DEFAULT_HOPLIMIT;
 
