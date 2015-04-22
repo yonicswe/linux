@@ -1618,7 +1618,7 @@ static int __mlx4_ib_modify_qp(struct ib_qp *ibqp,
 
 		if (ibqp->qp_type == IB_QPT_GSI) {
 			enum ib_gid_type gid_type = qp->flags & MLX4_IB_ROCE_V2_GSI_QP ?
-				IB_GID_TYPE_ROCE_V2 : IB_GID_TYPE_IB;
+				IB_GID_TYPE_IBOE_V2 : IB_GID_TYPE_IBOE_V1;
 			u8 qpc_roce_mode = gid_type_to_qpc(gid_type);
 
 			context->rlkey_roce_mode |= (qpc_roce_mode << 6);
@@ -2823,7 +2823,7 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 			if (!ib_get_cached_gid(ibqp->device,
 					       be32_to_cpu(ah->av.ib.port_pd) >> 24,
 					       ah->av.ib.gid_index, &gid, &gid_attr))
-				qp = (gid_attr.gid_type == IB_GID_TYPE_ROCE_V2) ?
+				qp = (gid_attr.gid_type == IB_GID_TYPE_IBOE_V2) ?
 					to_mqp(sqp->roce_v2_gsi) : qp;
 		}
 	}
