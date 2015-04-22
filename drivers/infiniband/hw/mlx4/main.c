@@ -1612,7 +1612,7 @@ static int mlx4_ib_update_gids_v1_v2(struct gid_entry *gids,
 	gid_tbl = mailbox->buf;
 	for (i = 0; i < MLX4_MAX_PORT_GIDS; ++i) {
 		memcpy(&gid_tbl[i].gid, &gids[i].gid, sizeof(union ib_gid));
-		if (gids[i].gid_type == IB_GID_TYPE_ROCE_V2) {
+		if (gids[i].gid_type == IB_GID_TYPE_IBOE_V2) {
 			gid_tbl[i].version = 2;
 			if (!ipv6_addr_v4mapped((struct in6_addr *)&gids[i].gid))
 				gid_tbl[i].type = 1;
