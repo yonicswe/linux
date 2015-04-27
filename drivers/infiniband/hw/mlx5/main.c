@@ -1001,7 +1001,7 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
 	}
 
 	cq = ib_create_cq(&dev->ib_dev, mlx5_umr_cq_handler, NULL, NULL, 128,
-			  0);
+			  0, 0);
 	if (IS_ERR(cq)) {
 		mlx5_ib_dbg(dev, "Couldn't create CQ for sync UMR QP\n");
 		ret = PTR_ERR(cq);

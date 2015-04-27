@@ -320,11 +320,12 @@ isert_alloc_comps(struct isert_device *device,
 
 		comp->device = device;
 		INIT_WORK(&comp->work, isert_cq_work);
-		comp->cq = ib_create_cq(device->ib_device,
-					isert_cq_callback,
+		comp->cq = ib_create_cq(device->ib_device, isert_cq_callback,
 					isert_cq_event_callback,
 					(void *)comp,
-					max_cqe, i);
+					max_cqe,
+					i,
+					0);
 		if (IS_ERR(comp->cq)) {
 			isert_err("Unable to allocate cq\n");
 			ret = PTR_ERR(comp->cq);

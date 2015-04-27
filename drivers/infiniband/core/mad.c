@@ -2944,8 +2944,8 @@ static int ib_mad_port_open(struct ib_device *device,
 		cq_size *= 2;
 
 	port_priv->cq = ib_create_cq(port_priv->device,
-				     ib_mad_thread_completion_handler,
-				     NULL, port_priv, cq_size, 0);
+				     ib_mad_thread_completion_handler, NULL,
+				     port_priv, cq_size, 0, 0);
 	if (IS_ERR(port_priv->cq)) {
 		dev_err(&device->dev, "Couldn't create ib_mad CQ\n");
 		ret = PTR_ERR(port_priv->cq);

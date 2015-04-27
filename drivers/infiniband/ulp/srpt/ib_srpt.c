@@ -2091,7 +2091,7 @@ static int srpt_create_ch_ib(struct srpt_rdma_ch *ch)
 
 retry:
 	ch->cq = ib_create_cq(sdev->device, srpt_completion, NULL, ch,
-			      ch->rq_size + srp_sq_size, 0);
+			      ch->rq_size + srp_sq_size, 0, 0);
 	if (IS_ERR(ch->cq)) {
 		ret = PTR_ERR(ch->cq);
 		pr_err("failed to create CQ cqe= %d ret= %d\n",

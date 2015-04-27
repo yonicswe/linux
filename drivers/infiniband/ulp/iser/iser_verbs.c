@@ -126,11 +126,9 @@ static int iser_create_device_ib_res(struct iser_device *device)
 		struct iser_comp *comp = &device->comps[i];
 
 		comp->device = device;
-		comp->cq = ib_create_cq(device->ib_device,
-					iser_cq_callback,
-					iser_cq_event_callback,
-					(void *)comp,
-					max_cqe, i);
+		comp->cq = ib_create_cq(device->ib_device, iser_cq_callback,
+					iser_cq_event_callback, (void *)comp,
+					max_cqe, i, 0);
 		if (IS_ERR(comp->cq)) {
 			comp->cq = NULL;
 			goto cq_err;

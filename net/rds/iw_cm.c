@@ -199,8 +199,8 @@ static int rds_iw_init_qp_attrs(struct ib_qp_init_attr *attr,
 	attr->qp_type = IB_QPT_RC;
 
 	attr->send_cq = ib_create_cq(dev, send_cq_handler,
-				     rds_iw_cq_event_handler,
-				     context, send_size, 0);
+				     rds_iw_cq_event_handler, context,
+				     send_size, 0, 0);
 	if (IS_ERR(attr->send_cq)) {
 		ret = PTR_ERR(attr->send_cq);
 		attr->send_cq = NULL;
@@ -209,8 +209,8 @@ static int rds_iw_init_qp_attrs(struct ib_qp_init_attr *attr,
 	}
 
 	attr->recv_cq = ib_create_cq(dev, recv_cq_handler,
-				     rds_iw_cq_event_handler,
-				     context, recv_size, 0);
+				     rds_iw_cq_event_handler, context,
+				     recv_size, 0, 0);
 	if (IS_ERR(attr->recv_cq)) {
 		ret = PTR_ERR(attr->recv_cq);
 		attr->recv_cq = NULL;

@@ -707,7 +707,7 @@ rdma_create_trans(struct p9_client *client, const char *addr, char *args)
 	/* Create the Completion Queue */
 	rdma->cq = ib_create_cq(rdma->cm_id->device, cq_comp_handler,
 				cq_event_handler, client,
-				opts.sq_depth + opts.rq_depth + 1, 0);
+				opts.sq_depth + opts.rq_depth + 1, 0, 0);
 	if (IS_ERR(rdma->cq))
 		goto error;
 	ib_req_notify_cq(rdma->cq, IB_CQ_NEXT_COMP);

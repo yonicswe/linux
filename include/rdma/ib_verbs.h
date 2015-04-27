@@ -173,6 +173,10 @@ struct ib_odp_caps {
 	} per_transport_caps;
 };
 
+enum ib_cq_creation_flags {
+	IB_CQ_FLAGS_TIMESTAMP	= 1 << 0,
+};
+
 struct ib_cq_init_attr {
 	int cqe;
 	int comp_vector;
@@ -2193,7 +2197,7 @@ static inline int ib_post_recv(struct ib_qp *qp,
 struct ib_cq *ib_create_cq(struct ib_device *device,
 			   ib_comp_handler comp_handler,
 			   void (*event_handler)(struct ib_event *, void *),
-			   void *cq_context, int cqe, int comp_vector);
+			   void *cq_context, int cqe, int comp_vector, u32 flags);
 
 /**
  * ib_resize_cq - Modifies the capacity of the CQ.

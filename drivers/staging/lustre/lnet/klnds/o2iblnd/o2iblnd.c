@@ -742,10 +742,9 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
 
 	kiblnd_map_rx_descs(conn);
 
-	cq = ib_create_cq(cmid->device,
-			  kiblnd_cq_completion, kiblnd_cq_event, conn,
-			  IBLND_CQ_ENTRIES(version),
-			  kiblnd_get_completion_vector(conn, cpt));
+	cq = ib_create_cq(cmid->device, kiblnd_cq_completion,
+			  kiblnd_cq_event, conn, IBLND_CQ_ENTRIES(version),
+			  kiblnd_get_completion_vector(conn, cpt), 0);
 	if (IS_ERR(cq)) {
 		CERROR("Can't create CQ: %ld, cqe: %d\n",
 		       PTR_ERR(cq), IBLND_CQ_ENTRIES(version));

@@ -507,14 +507,14 @@ static int srp_create_ch_ib(struct srp_rdma_ch *ch)
 
 	/* + 1 for SRP_LAST_WR_ID */
 	recv_cq = ib_create_cq(dev->dev, srp_recv_completion, NULL, ch,
-			       target->queue_size + 1, ch->comp_vector);
+			       target->queue_size + 1, ch->comp_vector, 0);
 	if (IS_ERR(recv_cq)) {
 		ret = PTR_ERR(recv_cq);
 		goto err;
 	}
 
 	send_cq = ib_create_cq(dev->dev, srp_send_completion, NULL, ch,
-			       m * target->queue_size, ch->comp_vector);
+			       m * target->queue_size, ch->comp_vector, 0);
 	if (IS_ERR(send_cq)) {
 		ret = PTR_ERR(send_cq);
 		goto err_recv_cq;
