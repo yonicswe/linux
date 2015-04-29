@@ -233,6 +233,8 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 	props->max_total_mcast_qp_attach = props->max_mcast_qp_attach *
 					   props->max_mcast_grp;
 	props->max_map_per_fmr = dev->dev->caps.max_fmr_maps;
+	props->hca_core_clock = dev->dev->caps.hca_core_clock;
+	props->timestamp_mask = 0xFFFFFFFFFFFFULL;
 
 out:
 	kfree(in_mad);
