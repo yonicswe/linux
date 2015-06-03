@@ -2092,6 +2092,25 @@ static inline bool rdma_cap_read_multi_sge(struct ib_device *device,
 	return !(device->port_immutable[port_num].core_cap_flags & RDMA_CORE_CAP_PROT_IWARP);
 }
 
+/**
+ * rdma_cap_roce_gid_table - Check if the port of device uses roce_gid_table
+ * @device: Device to check
+ * @port_num: Port number to check
+ *
+ * RoCE GID table mechanism manages the various GIDs for a device.
+ *
+ * NOTE: if allocating the port's GID table has failed, this call will still
+ * return true, but any RoCE GID table API will fail.
+ *
+ * Return: true if the port uses RoCE GID table mechanism in order to manage
+ * its GIDs.
+ */
+static inline bool rdma_cap_roce_gid_table(const struct ib_device *device,
+					   u8 port_num)
+{
+	return rdma_protocol_roce(device, port_num) && device->cache.roce_gid_table;
+}
+
 int ib_query_gid(struct ib_device *device,
 		 u8 port_num, int index, union ib_gid *gid);
 
@@ -2107,7 +2126,7 @@ int ib_modify_port(struct ib_device *device,
 		   struct ib_port_modify *port_modify);
 
 int ib_find_gid(struct ib_device *device, union ib_gid *gid,
-		u8 *port_num, u16 *index);
+		struct net_device *ndev, u8 *port_num, u16 *index);
 
 int ib_find_pkey(struct ib_device *device,
 		 u8 port_num, u16 pkey, u16 *index);

@@ -40,6 +40,7 @@
 #include <linux/mutex.h>
 #include <rdma/rdma_netlink.h>
 #include <rdma/ib_addr.h>
+#include <rdma/ib_cache.h>
 
 #include "core_priv.h"
 
@@ -593,6 +594,10 @@ EXPORT_SYMBOL(ib_query_port);
 int ib_query_gid(struct ib_device *device,
 		 u8 port_num, int index, union ib_gid *gid)
 {
+	if (rdma_cap_roce_gid_table(device, port_num))
+		return roce_gid_table_get_gid(device, port_num, index, gid,
+					      NULL);
+
 	return device->query_gid(device, port_num, index, gid);
 }
 EXPORT_SYMBOL(ib_query_gid);
@@ -738,18 +743,26 @@ EXPORT_SYMBOL(ib_modify_port);
  *   a specified GID value occurs.
  * @device: The device to query.
  * @gid: The GID value to search for.
+ * @ndev: In RoCE, the net device of the device. Null means ignore.
  * @port_num: The port number of the device where the GID value was found.
  * @index: The index into the GID table where the GID was found.  This
  *   parameter may be NULL.
  */
 int ib_find_gid(struct ib_device *device, union ib_gid *gid,
-		u8 *port_num, u16 *index)
+		struct net_device *ndev, u8 *port_num, u16 *index)
 {
 	union ib_gid tmp_gid;
 	int ret, port, i;
 
+	if (device->cache.roce_gid_table &&
+	    !roce_gid_table_find_gid(device, gid, ndev, port_num, index))
+		return 0;
+
 	for (port = rdma_start_port(device); port <= rdma_end_port(device); ++port) {
-		for (i = 0; i < device->port_immutable[port].gid_tbl_len; ++i) {
+		if (rdma_cap_roce_gid_table(device, port))
+			continue;
+
+		for (i = 0; i < device->port_immutable[port].pkey_tbl_len; ++i) {
 			ret = ib_query_gid(device, port, i, &tmp_gid);
 			if (ret)
 				return ret;
