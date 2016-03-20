@@ -54,10 +54,10 @@
 #endif
 
 int cifsFYI = 0;
-int traceSMB = 0;
+bool traceSMB;
 bool enable_oplocks = true;
-unsigned int linuxExtEnabled = 1;
-unsigned int lookupCacheEnabled = 1;
+bool linuxExtEnabled = true;
+bool lookupCacheEnabled = true;
 unsigned int global_secflags = CIFSSEC_DEF;
 /* unsigned int ntlmv2_support = 0; */
 unsigned int sign_CIFS_PDUs = 1;
@@ -1012,7 +1012,6 @@ const struct file_operations cifs_file_strict_ops = {
 	.splice_read = generic_file_splice_read,
 	.llseek = cifs_llseek,
 	.unlocked_ioctl	= cifs_ioctl,
-	.clone_file_range = cifs_clone_file_range,
 	.clone_file_range = cifs_clone_file_range,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
