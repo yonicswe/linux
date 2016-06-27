@@ -2122,7 +2122,8 @@ struct ib_device {
 	void (*get_dev_fw_str)(struct ib_device *, char *str, size_t str_len);
 	struct list_head type_list;
 
-	const struct uverbs_types_group	*types_group;
+	u16					driver_id;
+	const struct uverbs_types_group		*types_group;
 };
 
 struct ib_client {
