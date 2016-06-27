@@ -42,6 +42,11 @@
 #include <rdma/ib_verbs.h>
 #include <linux/mutex.h>
 
+int uverbs_group_idx(u16 *id, unsigned int ngroups);
+const struct uverbs_type *uverbs_get_type(const struct ib_device *ibdev,
+					  uint16_t type);
+const struct uverbs_action *uverbs_get_action(const struct uverbs_type *type,
+					      uint16_t action);
 struct ib_uobject *uverbs_get_type_from_idr(const struct uverbs_type_alloc_action *type,
 					    struct ib_ucontext *ucontext,
 					    enum uverbs_idr_access access,
@@ -57,6 +62,10 @@ void uverbs_commit_objects(struct uverbs_attr_array *attr_array,
 			   const struct uverbs_action *action,
 			   bool success);
 
+void ib_uverbs_uobject_type_cleanup_ucontext(struct ib_ucontext *ucontext,
+					     const struct uverbs_root *root);
+int ib_uverbs_uobject_type_initialize_ucontext(struct ib_ucontext *ucontext);
+void ib_uverbs_uobject_type_release_ucontext(struct ib_ucontext *ucontext);
 void ib_uverbs_close_fd(struct file *f);
 void ib_uverbs_cleanup_fd(void *private_data);
 

@@ -37,6 +37,51 @@
 #include "rdma_core.h"
 #include <rdma/uverbs_ioctl.h>
 
+int uverbs_group_idx(u16 *id, unsigned int ngroups)
+{
+	int ret = (*id & UVERBS_ID_RESERVED_MASK) >> UVERBS_ID_RESERVED_SHIFT;
+
+	if (ret >= ngroups)
+		return -EINVAL;
+
+	*id &= ~UVERBS_ID_RESERVED_MASK;
+	return ret;
+}
+
+const struct uverbs_type *uverbs_get_type(const struct ib_device *ibdev,
+					  uint16_t type)
+{
+	const struct uverbs_root *groups = ibdev->specs_root;
+	const struct uverbs_type_group *types;
+	int ret = uverbs_group_idx(&type, groups->num_groups);
+
+	if (ret < 0)
+		return NULL;
+
+	types = groups->type_groups[ret];
+
+	if (type >= types->num_types)
+		return NULL;
+
+	return types->types[type];
+}
+
+const struct uverbs_action *uverbs_get_action(const struct uverbs_type *type,
+					      uint16_t action)
+{
+	const struct uverbs_action_group *action_group;
+	int ret = uverbs_group_idx(&action, type->num_groups);
+
+	if (ret < 0)
+		return NULL;
+
+	action_group = type->action_groups[ret];
+	if (action >= action_group->num_actions)
+		return NULL;
+
+	return action_group->actions[action];
+}
+
 static int uverbs_lock_object(struct ib_uobject *uobj,
 			      enum uverbs_idr_access access)
 {
@@ -67,6 +112,12 @@ struct ib_ucontext_lock {
 	/* locking the uobjects_list */
 	struct mutex lock;
 };
+
+static void init_uobjects_list_lock(struct ib_ucontext_lock *lock)
+{
+	mutex_init(&lock->lock);
+	kref_init(&lock->ref);
+}
 
 static void release_uobjects_list_lock(struct kref *ref)
 {
@@ -335,6 +386,20 @@ void uverbs_rollback_object(struct ib_uobject *uobj,
 	return uverbs_commit_object(uobj, access, false);
 }
 
+static void ib_uverbs_remove_fd(struct ib_uobject *uobject)
+{
+	/*
+	 * user should release the uobject in the release
+	 * callback.
+	 */
+	if (uobject->context) {
+		list_del(&uobject->list);
+		uobject->type->free_fn(uobject->type, uobject);
+		kref_put(&uobject->context->ufile->ref, ib_uverbs_release_file);
+		uobject->context = NULL;
+	}
+}
+
 void ib_uverbs_close_fd(struct file *f)
 {
 	struct ib_uobject *uobject = f->private_data - sizeof(struct ib_uobject);
@@ -387,3 +452,70 @@ void uverbs_commit_objects(struct uverbs_attr_array *attr_array,
 		}
 	}
 }
+
+static unsigned int get_type_orders(const struct uverbs_root *root)
+{
+	unsigned int i;
+	unsigned int max = 0;
+
+	for (i = 0; i < root->num_groups; i++) {
+		unsigned int j;
+		const struct uverbs_type_group *types = root->type_groups[i];
+
+		for (j = 0; j < types->num_types; j++) {
+			if (!types->types[j] || !types->types[j]->alloc)
+				continue;
+			if (types->types[j]->alloc->order > max)
+				max = types->types[j]->alloc->order;
+		}
+	}
+
+	return max;
+}
+
+void ib_uverbs_uobject_type_cleanup_ucontext(struct ib_ucontext *ucontext,
+					     const struct uverbs_root *root)
+{
+	unsigned int num_orders = get_type_orders(root);
+	unsigned int i;
+
+	for (i = 0; i <= num_orders; i++) {
+		struct ib_uobject *obj, *next_obj;
+
+		/*
+		 * No need to take lock here, as cleanup should be called
+		 * after all commands finished executing. Newly executed
+		 * commands should fail.
+		 */
+		mutex_lock(&ucontext->uobjects_lock->lock);
+		list_for_each_entry_safe(obj, next_obj, &ucontext->uobjects,
+					 list)
+			if (obj->type->order == i) {
+				if (obj->type->type == UVERBS_ATTR_TYPE_IDR)
+					ib_uverbs_uobject_remove(obj, false);
+				else
+					ib_uverbs_remove_fd(obj);
+			}
+		mutex_unlock(&ucontext->uobjects_lock->lock);
+	}
+	kref_put(&ucontext->uobjects_lock->ref, release_uobjects_list_lock);
+}
+
+int ib_uverbs_uobject_type_initialize_ucontext(struct ib_ucontext *ucontext)
+{
+	ucontext->uobjects_lock = kmalloc(sizeof(*ucontext->uobjects_lock),
+					  GFP_KERNEL);
+	if (!ucontext->uobjects_lock)
+		return -ENOMEM;
+
+	init_uobjects_list_lock(ucontext->uobjects_lock);
+	INIT_LIST_HEAD(&ucontext->uobjects);
+
+	return 0;
+}
+
+void ib_uverbs_uobject_type_release_ucontext(struct ib_ucontext *ucontext)
+{
+	kfree(ucontext->uobjects_lock);
+}
+
