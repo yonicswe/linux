@@ -180,6 +180,7 @@ void idr_remove_uobj(struct ib_uobject *uobj);
 struct file *ib_uverbs_alloc_event_file(struct ib_uverbs_file *uverbs_file,
 					struct ib_device *ib_dev,
 					int is_async);
+void ib_uverbs_release_file(struct kref *ref);
 void ib_uverbs_free_async_event_file(struct ib_uverbs_file *uverbs_file);
 struct ib_uverbs_event_file *ib_uverbs_lookup_comp_file(int fd);
 
