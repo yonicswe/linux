@@ -1329,8 +1329,11 @@ struct ib_fmr_attr {
 
 struct ib_umem;
 
+struct ib_ucontext_lock;
+
 struct ib_ucontext {
 	struct ib_device       *device;
+	struct ib_uverbs_file  *ufile;
 	struct list_head	pd_list;
 	struct list_head	mr_list;
 	struct list_head	mw_list;
@@ -1343,6 +1346,10 @@ struct ib_ucontext {
 	struct list_head	wq_list;
 	struct list_head	rwq_ind_tbl_list;
 	int			closing;
+
+	/* lock for uobjects list */
+	struct ib_ucontext_lock	*uobjects_lock;
+	struct list_head	uobjects;
 
 	struct pid             *tgid;
 #ifdef CONFIG_INFINIBAND_ON_DEMAND_PAGING
@@ -1363,16 +1370,28 @@ struct ib_ucontext {
 #endif
 };
 
+struct uverbs_object_list;
+
+#define OLD_ABI_COMPAT
+
 struct ib_uobject {
 	u64			user_handle;	/* handle given to us by userspace */
 	struct ib_ucontext     *context;	/* associated user context */
 	void		       *object;		/* containing object */
 	struct list_head	list;		/* link to context's list */
-	int			id;		/* index into kernel idr */
-	struct kref		ref;
-	struct rw_semaphore	mutex;		/* protects .live */
+	int			id;		/* index into kernel idr/fd */
+#ifdef OLD_ABI_COMPAT
+	struct kref             ref;
+#endif
+	struct rw_semaphore	usecnt;		/* protects exclusive access */
+#ifdef OLD_ABI_COMPAT
+	struct rw_semaphore     mutex;          /* protects .live */
+#endif
 	struct rcu_head		rcu;		/* kfree_rcu() overhead */
 	int			live;
+
+	const struct uverbs_type_alloc_action *type;
+	struct ib_ucontext_lock	*uobjects_lock;
 };
 
 struct ib_udata {
@@ -2101,6 +2120,9 @@ struct ib_device {
 	 */
 	int (*get_port_immutable)(struct ib_device *, u8, struct ib_port_immutable *);
 	void (*get_dev_fw_str)(struct ib_device *, char *str, size_t str_len);
+	struct list_head type_list;
+
+	const struct uverbs_types_group	*types_group;
 };
 
 struct ib_client {
