@@ -369,6 +369,43 @@ static int ib_uverbs_event_close(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static void ib_uverbs_release_refactored_event_file(struct kref *ref)
+{
+	struct ib_uverbs_event_file *file =
+		container_of(ref, struct ib_uverbs_event_file, ref);
+
+	ib_uverbs_cleanup_fd(file);
+}
+
+/* TODO: REFACTOR */
+static int ib_uverbs_event_refactored_close(struct inode *inode, struct file *filp)
+{
+	struct ib_uverbs_event_file *file = filp->private_data;
+	struct ib_uverbs_event *entry, *tmp;
+
+	spin_lock_irq(&file->lock);
+	list_for_each_entry_safe(entry, tmp, &file->event_list, list) {
+		if (entry->counter)
+			list_del(&entry->obj_list);
+		kfree(entry);
+	}
+	spin_unlock_irq(&file->lock);
+
+	ib_uverbs_close_fd(filp);
+	kref_put(&file->ref, ib_uverbs_release_refactored_event_file);
+
+	return 0;
+}
+
+const struct file_operations uverbs_refactored_event_fops = {
+	.owner	 = THIS_MODULE,
+	.read	 = ib_uverbs_event_read,
+	.poll    = ib_uverbs_event_poll,
+	.release = ib_uverbs_event_refactored_close,
+	.fasync  = ib_uverbs_event_fasync,
+	.llseek	 = no_llseek,
+};
+
 static const struct file_operations uverbs_event_fops = {
 	.owner	 = THIS_MODULE,
 	.read	 = ib_uverbs_event_read,

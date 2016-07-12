@@ -134,6 +134,153 @@ struct uverbs_types_group {
 	void					*priv;
 };
 
+#define UVERBS_ATTR(_id, _len, _type)					\
+	[_id] = {.len = _len, .type = _type}
+#define UVERBS_ATTR_PTR_IN(_id, _len)					\
+	UVERBS_ATTR(_id, _len, UVERBS_ATTR_TYPE_PTR_IN)
+#define UVERBS_ATTR_PTR_OUT(_id, _len)					\
+	UVERBS_ATTR(_id, _len, UVERBS_ATTR_TYPE_PTR_OUT)
+#define UVERBS_ATTR_IDR(_id, _idr_type, _access)			\
+	[_id] = {.type = UVERBS_ATTR_TYPE_IDR,				\
+		 .obj = {.obj_type = _idr_type,				\
+			 .access = _access				\
+		 } }
+#define UVERBS_ATTR_FD(_id, _fd_type, _access)				\
+	[_id] = {.type = UVERBS_ATTR_TYPE_FD,				\
+		 .obj = {.obj_type = _fd_type,				\
+			 .access = _access + BUILD_BUG_ON_ZERO(		\
+				_access != UVERBS_IDR_ACCESS_NEW &&	\
+				_access != UVERBS_IDR_ACCESS_READ)	\
+		 } }
+#define _UVERBS_ATTR_SPEC_SZ(...)					\
+	(sizeof((const struct uverbs_attr_spec[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_attr_spec))
+#define UVERBS_ATTR_SPEC(...)					\
+	((const struct uverbs_attr_group_spec)				\
+	 {.attrs = (struct uverbs_attr_spec[]){__VA_ARGS__},		\
+	  .num_attrs = _UVERBS_ATTR_SPEC_SZ(__VA_ARGS__)})
+#define DECLARE_UVERBS_ATTR_SPEC(name, ...)			\
+	const struct uverbs_attr_group_spec name =			\
+		UVERBS_ATTR_SPEC(__VA_ARGS__)
+#define _UVERBS_ATTR_ACTION_SPEC_SZ(...)				  \
+	(sizeof((const struct uverbs_attr_group_spec *[]){__VA_ARGS__}) / \
+	 sizeof(const struct uverbs_attr_group_spec *))
+#define _UVERBS_ATTR_ACTION_SPEC(_distfn, _priv, ...)			\
+	{.dist = _distfn,						\
+	 .priv = _priv,							\
+	 .num_groups =	_UVERBS_ATTR_ACTION_SPEC_SZ(__VA_ARGS__),	\
+	 .attr_groups = (const struct uverbs_attr_group_spec *[]){__VA_ARGS__} }
+#define UVERBS_ACTION_SPEC(...)						\
+	_UVERBS_ATTR_ACTION_SPEC(ib_uverbs_std_dist,			\
+				(void *)_UVERBS_ATTR_ACTION_SPEC_SZ(__VA_ARGS__),\
+				__VA_ARGS__)
+#define UVERBS_ACTION(_handler, _priv, ...)				\
+	((const struct uverbs_action) {					\
+		.priv = &(struct uverbs_action_std_handler)		\
+			{.handler = _handler,				\
+			 .priv = _priv},				\
+		.handler = uverbs_action_std_handle,			\
+		.spec = UVERBS_ACTION_SPEC(__VA_ARGS__)})
+#define UVERBS_CTX_ACTION(_handler, _priv, ...)			\
+	((const struct uverbs_action){					\
+		.priv = &(struct uverbs_action_std_ctx_handler)		\
+			{.handler = _handler,				\
+			 .priv = _priv},				\
+		.handler = uverbs_action_std_ctx_handle,		\
+		.spec = UVERBS_ACTION_SPEC(__VA_ARGS__)})
+#define _UVERBS_ACTIONS_SZ(...)					\
+	(sizeof((const struct uverbs_action *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_action *))
+#define ADD_UVERBS_ACTION(action_idx, _handler, _priv,  ...)		\
+	[action_idx] = &UVERBS_ACTION(_handler, _priv, __VA_ARGS__)
+#define DECLARE_UVERBS_ACTION(name, _handler, _priv, ...)		\
+	const struct uverbs_action name =				\
+		UVERBS_ACTION(_handler, _priv, __VA_ARGS__)
+#define ADD_UVERBS_CTX_ACTION(action_idx, _handler, _priv,  ...)	\
+	[action_idx] = &UVERBS_CTX_ACTION(_handler, _priv, __VA_ARGS__)
+#define DECLARE_UVERBS_CTX_ACTION(name, _handler, _priv, ...)	\
+	const struct uverbs_action name =				\
+		UVERBS_CTX_ACTION(_handler, _priv, __VA_ARGS__)
+#define ADD_UVERBS_ACTION_PTR(idx, ptr)					\
+	[idx] = ptr
+#define UVERBS_ACTIONS(...)						\
+	((const struct uverbs_type_actions_group)			\
+	  {.num_actions = _UVERBS_ACTIONS_SZ(__VA_ARGS__),		\
+	   .actions = (const struct uverbs_action *[]){__VA_ARGS__} })
+#define DECLARE_UVERBS_ACTIONS(name, ...)				\
+	const struct  uverbs_type_actions_group name =			\
+		UVERBS_ACTIONS(__VA_ARGS__)
+#define _UVERBS_ACTIONS_GROUP_SZ(...)					\
+	(sizeof((const struct uverbs_type_actions_group*[]){__VA_ARGS__}) / \
+	 sizeof(const struct uverbs_type_actions_group *))
+#define UVERBS_TYPE_ALLOC_FD(_order, _obj_size, _free_fn, _fops, _name, _flags)\
+	((const struct uverbs_type_alloc_action)			\
+	 {.type = UVERBS_ATTR_TYPE_FD,					\
+	 .order = _order,						\
+	 .obj_size = _obj_size,						\
+	 .free_fn = _free_fn,						\
+	 .fd = {.fops = _fops,						\
+		.name = _name,						\
+		.flags = _flags} })
+#define UVERBS_TYPE_ALLOC_IDR_SZ(_size, _order, _free_fn)		\
+	((const struct uverbs_type_alloc_action)			\
+	 {.type = UVERBS_ATTR_TYPE_IDR,					\
+	 .order = _order,						\
+	 .free_fn = _free_fn,						\
+	 .obj_size = _size,})
+#define UVERBS_TYPE_ALLOC_IDR(_order, _free_fn)				\
+	 UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_uobject), _order, _free_fn)
+#define _DECLARE_UVERBS_TYPE(name, _alloc, _dist, _priv, ...)		\
+	const struct uverbs_type name = {				\
+		.alloc = _alloc,					\
+		.dist = _dist,						\
+		.priv = _priv,						\
+		.num_groups = _UVERBS_ACTIONS_GROUP_SZ(__VA_ARGS__),	\
+		.action_groups = (const struct uverbs_type_actions_group *[]){__VA_ARGS__} \
+	}
+#define DECLARE_UVERBS_TYPE(name, _alloc,  ...)				\
+	_DECLARE_UVERBS_TYPE(name, _alloc, ib_uverbs_std_dist, NULL,	\
+			     __VA_ARGS__)
+#define _UVERBS_TYPE_SZ(...)						\
+	(sizeof((const struct uverbs_type *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_type *))
+#define ADD_UVERBS_TYPE_ACTIONS(type_idx, ...)				\
+	[type_idx] = &UVERBS_ACTIONS(__VA_ARGS__)
+#define ADD_UVERBS_TYPE(type_idx, type_ptr)				\
+	[type_idx] = ((const struct uverbs_type * const)&type_ptr)
+#define UVERBS_TYPES(...)  ((const struct uverbs_types)			\
+	{.num_types = _UVERBS_TYPE_SZ(__VA_ARGS__),			\
+	 .types = (const struct uverbs_type *[]){__VA_ARGS__} })
+#define DECLARE_UVERBS_TYPES(name, ...)				\
+	const struct uverbs_types name = UVERBS_TYPES(__VA_ARGS__)
+
+#define _UVERBS_TYPES_SZ(...)						\
+	(sizeof((const struct uverbs_types *[]){__VA_ARGS__}) /	\
+	 sizeof(const struct uverbs_types *))
+
+#define UVERBS_TYPES_GROUP(_dist, _priv, ...)				\
+	((const struct uverbs_types_group){				\
+		.dist = _dist,						\
+		.priv = _priv,						\
+		.type_groups = (const struct uverbs_types *[]){__VA_ARGS__},\
+		.num_groups = _UVERBS_TYPES_SZ(__VA_ARGS__)})
+#define _DECLARE_UVERBS_TYPES_GROUP(name, _dist, _priv, ...)		\
+	const struct uverbs_types_group name = UVERBS_TYPES_GROUP(_dist, _priv,\
+								  __VA_ARGS__)
+#define DECLARE_UVERBS_TYPES_GROUP(name, ...)		\
+	_DECLARE_UVERBS_TYPES_GROUP(name, ib_uverbs_std_dist, NULL, __VA_ARGS__)
+
+#define UVERBS_COPY_TO(attr_array, idx, from)				\
+	((attr_array)->attrs[idx].valid ?				\
+	 (copy_to_user((attr_array)->attrs[idx].cmd_attr.ptr, (from),	\
+		       (attr_array)->attrs[idx].cmd_attr.len) ?		\
+	  -EFAULT : 0) : -ENOENT)
+#define UVERBS_COPY_FROM(to, attr_array, idx)				\
+	((attr_array)->attrs[idx].valid ?				\
+	 (copy_from_user((to), (attr_array)->attrs[idx].cmd_attr.ptr,	\
+			 (attr_array)->attrs[idx].cmd_attr.len) ?	\
+	  -EFAULT : 0) : -ENOENT)
+
 /* =================================================
  *              Parsing infrastructure
  * =================================================
