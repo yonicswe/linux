@@ -51,6 +51,7 @@
 #include <linux/list.h>
 #include <rdma/ib_smi.h>
 #include <rdma/ib_umem.h>
+#include <rdma/uverbs_ioctl_cmd.h>
 #include <linux/in.h>
 #include <linux/etherdevice.h>
 #include <linux/mlx5/fs.h>
@@ -3128,6 +3129,7 @@ static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
 	if (err)
 		goto err_odp;
 
+	dev->ib_dev.types_group = &uverbs_types_group;
 	err = ib_register_device(&dev->ib_dev, NULL);
 	if (err)
 		goto err_q_cnt;
