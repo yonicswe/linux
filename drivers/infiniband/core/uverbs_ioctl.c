@@ -176,10 +176,11 @@ static int uverbs_handle_action(struct ib_uverbs_attr __user *uattr_ptr,
 	return ret;
 }
 
-static long ib_uverbs_cmd_verbs(struct ib_device *ib_dev,
-				struct ib_uverbs_file *file,
-				struct ib_uverbs_ioctl_hdr *hdr,
-				void __user *buf)
+long ib_uverbs_cmd_verbs(struct ib_device *ib_dev,
+			 struct ib_uverbs_file *file,
+			 struct ib_uverbs_ioctl_hdr *hdr,
+			 void __user *buf,
+			 mm_segment_t oldfs)
 {
 	const struct uverbs_type *type;
 	const struct uverbs_action *action;
@@ -193,6 +194,7 @@ static long ib_uverbs_cmd_verbs(struct ib_device *ib_dev,
 	} *ctx = NULL;
 	struct uverbs_attr *curr_attr;
 	size_t ctx_size;
+	mm_segment_t currentfs = get_fs();
 
 	if (!ib_dev)
 		return -EIO;
@@ -240,8 +242,10 @@ static long ib_uverbs_cmd_verbs(struct ib_device *ib_dev,
 		goto out;
 	}
 
+	set_fs(oldfs);
 	err = uverbs_handle_action(buf, ctx->uattrs, hdr->num_attrs, ib_dev,
 				   file, action, ctx->uverbs_attr_array);
+	set_fs(currentfs);
 out:
 	kfree(ctx);
 	return err;
@@ -296,7 +300,8 @@ long ib_uverbs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (!down_read_trylock(&file->close_sem))
 			return -EIO;
 		err = ib_uverbs_cmd_verbs(ib_dev, file, &hdr,
-					  (__user void *)arg + sizeof(hdr));
+					  (__user void *)arg + sizeof(hdr),
+					  get_fs());
 		up_read(&file->close_sem);
 	}
 out:
