@@ -113,6 +113,18 @@ enum uverbs_common_types {
 	UVERBS_TYPE_LAST,
 };
 
+enum uverbs_create_qp_cmd_attr {
+	CREATE_QP_HANDLE,
+	CREATE_QP_PD_HANDLE,
+	CREATE_QP_SEND_CQ,
+	CREATE_QP_RECV_CQ,
+	CREATE_QP_SRQ,
+	CREATE_QP_USER_HANDLE,
+	CREATE_QP_CMD,
+	CREATE_QP_CMD_FLAGS,
+	CREATE_QP_RESP
+};
+
 enum uverbs_create_cq_cmd_attr {
 	CREATE_CQ_HANDLE,
 	CREATE_CQ_CQE,
@@ -121,6 +133,15 @@ enum uverbs_create_cq_cmd_attr {
 	CREATE_CQ_COMP_VECTOR,
 	CREATE_CQ_FLAGS,
 	CREATE_CQ_RESP_CQE,
+};
+
+enum uverbs_create_qp_xrc_tgt_cmd_attr {
+	CREATE_QP_XRC_TGT_HANDLE,
+	CREATE_QP_XRC_TGT_XRCD,
+	CREATE_QP_XRC_TGT_USER_HANDLE,
+	CREATE_QP_XRC_TGT_CMD,
+	CREATE_QP_XRC_TGT_CMD_FLAGS,
+	CREATE_QP_XRC_TGT_RESP
 };
 
 enum uverbs_create_comp_channel_cmd_attr {
@@ -203,6 +224,18 @@ int uverbs_create_cq_handler(struct ib_device *ib_dev,
 			     struct uverbs_attr_array *vendor,
 			     void *priv);
 
+int uverbs_create_qp_handler(struct ib_device *ib_dev,
+			     struct ib_ucontext *ucontext,
+			     struct uverbs_attr_array *common,
+			     struct uverbs_attr_array *vendor,
+			     void *priv);
+
+int uverbs_create_qp_xrc_tgt_handler(struct ib_device *ib_dev,
+				     struct ib_ucontext *ucontext,
+				     struct uverbs_attr_array *common,
+				     struct uverbs_attr_array *vendor,
+				     void *priv);
+
 extern const struct uverbs_action uverbs_action_get_context;
 extern const struct uverbs_action uverbs_action_create_cq;
 extern const struct uverbs_action uverbs_action_create_comp_channel;
@@ -210,6 +243,8 @@ extern const struct uverbs_action uverbs_action_query_device;
 extern const struct uverbs_action uverbs_action_alloc_pd;
 extern const struct uverbs_action uverbs_action_reg_mr;
 extern const struct uverbs_action uverbs_action_dereg_mr;
+extern const struct uverbs_action uverbs_action_create_qp;
+extern const struct uverbs_action uverbs_action_create_qp_xrc_tgt;
 
 enum uverbs_actions_mr_ops {
 	UVERBS_MR_REG,
@@ -230,6 +265,13 @@ enum uverbs_actions_cq_ops {
 
 extern const struct uverbs_type_actions_group uverbs_actions_cq;
 
+enum uverbs_actions_qp_ops {
+	UVERBS_QP_CREATE,
+	UVERBS_QP_CREATE_XRC_TGT,
+};
+
+extern const struct uverbs_type_actions_group uverbs_actions_qp;
+
 enum uverbs_actions_pd_ops {
 	UVERBS_PD_ALLOC
 };
@@ -244,6 +286,7 @@ enum uverbs_actions_device_ops {
 extern const struct uverbs_type_actions_group uverbs_actions_device;
 
 extern const struct uverbs_type uverbs_type_cq;
+extern const struct uverbs_type uverbs_type_qp;
 extern const struct uverbs_type uverbs_type_comp_channel;
 extern const struct uverbs_type uverbs_type_mr;
 extern const struct uverbs_type uverbs_type_pd;

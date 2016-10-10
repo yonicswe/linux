@@ -696,6 +696,227 @@ DECLARE_UVERBS_ACTION(uverbs_action_create_cq, uverbs_create_cq_handler, NULL,
 		      &uverbs_create_cq_spec, &uverbs_uhw_compat_spec);
 EXPORT_SYMBOL(uverbs_action_create_cq);
 
+static int qp_fill_attrs(struct ib_qp_init_attr *attr, struct ib_ucontext *ctx,
+			 const struct ib_uverbs_ioctl_create_qp *cmd,
+			 u32 create_flags)
+{
+	if (create_flags & ~(IB_QP_CREATE_BLOCK_MULTICAST_LOOPBACK |
+			     IB_QP_CREATE_CROSS_CHANNEL |
+			     IB_QP_CREATE_MANAGED_SEND |
+			     IB_QP_CREATE_MANAGED_RECV |
+			     IB_QP_CREATE_SCATTER_FCS))
+		return -EINVAL;
+
+	attr->event_handler = ib_uverbs_qp_event_handler;
+	attr->qp_context = ctx->ufile;
+	attr->sq_sig_type = cmd->sq_sig_all ? IB_SIGNAL_ALL_WR :
+		IB_SIGNAL_REQ_WR;
+	attr->qp_type = cmd->qp_type;
+
+	attr->cap.max_send_wr     = cmd->max_send_wr;
+	attr->cap.max_recv_wr     = cmd->max_recv_wr;
+	attr->cap.max_send_sge    = cmd->max_send_sge;
+	attr->cap.max_recv_sge    = cmd->max_recv_sge;
+	attr->cap.max_inline_data = cmd->max_inline_data;
+
+	return 0;
+}
+
+static void qp_init_uqp(struct ib_uqp_object *obj)
+{
+	obj->uevent.events_reported     = 0;
+	INIT_LIST_HEAD(&obj->uevent.event_list);
+	INIT_LIST_HEAD(&obj->mcast_list);
+}
+
+static int qp_write_resp(const struct ib_qp_init_attr *attr,
+			 const struct ib_qp *qp,
+			 struct uverbs_attr_array *common)
+{
+	struct ib_uverbs_ioctl_create_qp_resp resp = {
+		.qpn = qp->qp_num,
+		.max_recv_sge    = attr->cap.max_recv_sge,
+		.max_send_sge    = attr->cap.max_send_sge,
+		.max_recv_wr     = attr->cap.max_recv_wr,
+		.max_send_wr     = attr->cap.max_send_wr,
+		.max_inline_data = attr->cap.max_inline_data};
+
+	return UVERBS_COPY_TO(common, CREATE_QP_RESP, &resp);
+}
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_create_qp_spec,
+	UVERBS_ATTR_IDR(CREATE_QP_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW),
+	UVERBS_ATTR_IDR(CREATE_QP_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR(CREATE_QP_SEND_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR(CREATE_QP_RECV_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR(CREATE_QP_SRQ, UVERBS_TYPE_SRQ, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_USER_HANDLE, sizeof(__u64)),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_CMD, sizeof(struct ib_uverbs_ioctl_create_qp)),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_CMD_FLAGS, sizeof(__u32)),
+	UVERBS_ATTR_PTR_OUT(CREATE_QP_RESP, sizeof(struct ib_uverbs_ioctl_create_qp_resp)));
+EXPORT_SYMBOL(uverbs_create_qp_spec);
+
+int uverbs_create_qp_handler(struct ib_device *ib_dev,
+			     struct ib_ucontext *ucontext,
+			     struct uverbs_attr_array *common,
+			     struct uverbs_attr_array *vendor,
+			     void *priv)
+{
+	struct ib_uqp_object           *obj;
+	struct ib_udata uhw;
+	int ret;
+	__u64 user_handle = 0;
+	__u32 create_flags = 0;
+	struct ib_uverbs_ioctl_create_qp cmd;
+	struct ib_qp_init_attr attr = {};
+	struct ib_qp                   *qp;
+	struct ib_pd			*pd;
+
+	if (!common->attrs[CREATE_QP_HANDLE].valid ||
+	    !common->attrs[CREATE_QP_PD_HANDLE].valid ||
+	    !common->attrs[CREATE_QP_SEND_CQ].valid ||
+	    !common->attrs[CREATE_QP_RECV_CQ].valid ||
+	    !common->attrs[CREATE_QP_RESP].valid)
+		return -EINVAL;
+
+	ret = UVERBS_COPY_FROM(&cmd, common, CREATE_QP_CMD);
+	if (ret)
+		return ret;
+
+	/* Optional params */
+	if (UVERBS_COPY_FROM(&create_flags, common, CREATE_QP_CMD_FLAGS) == -EFAULT ||
+	    UVERBS_COPY_FROM(&user_handle, common, CREATE_QP_USER_HANDLE) == -EFAULT)
+		return -EFAULT;
+
+	if (cmd.qp_type == IB_QPT_XRC_INI) {
+		cmd.max_recv_wr = 0;
+		cmd.max_recv_sge = 0;
+	}
+
+	ret = qp_fill_attrs(&attr, ucontext, &cmd, create_flags);
+	if (ret)
+		return ret;
+
+	pd = common->attrs[CREATE_QP_PD_HANDLE].obj_attr.uobject->object;
+	attr.send_cq = common->attrs[CREATE_QP_SEND_CQ].obj_attr.uobject->object;
+	attr.recv_cq = common->attrs[CREATE_QP_RECV_CQ].obj_attr.uobject->object;
+	if (common->attrs[CREATE_QP_SRQ].valid)
+		attr.srq = common->attrs[CREATE_QP_SRQ].obj_attr.uobject->object;
+	obj = (struct ib_uqp_object *)common->attrs[CREATE_QP_HANDLE].obj_attr.uobject;
+
+	if (attr.srq && attr.srq->srq_type != IB_SRQT_BASIC)
+		return -EINVAL;
+
+	qp_init_uqp(obj);
+	create_udata(vendor, &uhw);
+	qp = pd->device->create_qp(pd, &attr, &uhw);
+	if (IS_ERR(qp))
+		return PTR_ERR(qp);
+	qp->real_qp	  = qp;
+	qp->device	  = pd->device;
+	qp->pd		  = pd;
+	qp->send_cq	  = attr.send_cq;
+	qp->recv_cq	  = attr.recv_cq;
+	qp->srq		  = attr.srq;
+	qp->event_handler = attr.event_handler;
+	qp->qp_context	  = attr.qp_context;
+	qp->qp_type	  = attr.qp_type;
+	atomic_set(&qp->usecnt, 0);
+	atomic_inc(&pd->usecnt);
+	atomic_inc(&attr.send_cq->usecnt);
+	if (attr.recv_cq)
+		atomic_inc(&attr.recv_cq->usecnt);
+	if (attr.srq)
+		atomic_inc(&attr.srq->usecnt);
+	qp->uobject = &obj->uevent.uobject;
+	obj->uevent.uobject.object = qp;
+	obj->uevent.uobject.user_handle = user_handle;
+
+	ret = qp_write_resp(&attr, qp, common);
+	if (ret) {
+		ib_destroy_qp(qp);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(uverbs_create_qp_handler);
+
+DECLARE_UVERBS_ACTION(uverbs_action_create_qp, uverbs_create_qp_handler, NULL,
+		      &uverbs_create_qp_spec, &uverbs_uhw_compat_spec);
+EXPORT_SYMBOL(uverbs_action_create_qp);
+
+DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_create_qp_xrc_tgt_spec,
+	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW),
+	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_XRCD, UVERBS_TYPE_XRCD, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_USER_HANDLE, sizeof(__u64)),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_CMD, sizeof(struct ib_uverbs_ioctl_create_qp)),
+	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_CMD_FLAGS, sizeof(__u32)),
+	UVERBS_ATTR_PTR_OUT(CREATE_QP_XRC_TGT_RESP, sizeof(struct ib_uverbs_ioctl_create_qp_resp)));
+EXPORT_SYMBOL(uverbs_create_qp_xrc_tgt_spec);
+
+int uverbs_create_qp_xrc_tgt_handler(struct ib_device *ib_dev,
+				     struct ib_ucontext *ucontext,
+				     struct uverbs_attr_array *common,
+				     struct uverbs_attr_array *vendor,
+				     void *priv)
+{
+	struct ib_uqp_object           *obj;
+	int ret;
+	__u64 user_handle = 0;
+	__u32 create_flags = 0;
+	struct ib_uverbs_ioctl_create_qp cmd;
+	struct ib_qp_init_attr attr = {};
+	struct ib_qp                   *qp;
+
+	if (!common->attrs[CREATE_QP_XRC_TGT_HANDLE].valid ||
+	    !common->attrs[CREATE_QP_XRC_TGT_XRCD].valid ||
+	    !common->attrs[CREATE_QP_XRC_TGT_RESP].valid)
+		return -EINVAL;
+
+	ret = UVERBS_COPY_FROM(&cmd, common, CREATE_QP_XRC_TGT_CMD);
+	if (ret)
+		return ret;
+
+	/* Optional params */
+	if (UVERBS_COPY_FROM(&create_flags, common, CREATE_QP_CMD_FLAGS) == -EFAULT ||
+	    UVERBS_COPY_FROM(&user_handle, common, CREATE_QP_USER_HANDLE) == -EFAULT)
+		return -EFAULT;
+
+	ret = qp_fill_attrs(&attr, ucontext, &cmd, create_flags);
+	if (ret)
+		return ret;
+
+	obj = (struct ib_uqp_object *)common->attrs[CREATE_QP_HANDLE].obj_attr.uobject;
+	obj->uxrcd = container_of(common->attrs[CREATE_QP_XRC_TGT_XRCD].obj_attr.uobject,
+				  struct ib_uxrcd_object, uobject);
+	attr.xrcd = obj->uxrcd->uobject.object;
+
+	qp_init_uqp(obj);
+	qp = ib_create_qp(NULL, &attr);
+	if (IS_ERR(qp))
+		return PTR_ERR(qp);
+	qp->uobject = &obj->uevent.uobject;
+	obj->uevent.uobject.object = qp;
+	obj->uevent.uobject.user_handle = user_handle;
+	atomic_inc(&obj->uxrcd->refcnt);
+
+	ret = qp_write_resp(&attr, qp, common);
+	if (ret) {
+		ib_destroy_qp(qp);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(uverbs_create_qp_xrc_tgt_handler);
+
+DECLARE_UVERBS_ACTION(uverbs_action_create_qp_xrc_tgt, uverbs_create_qp_xrc_tgt_handler,
+		      NULL, &uverbs_create_qp_spec);
+EXPORT_SYMBOL(uverbs_action_create_qp_xrc_tgt);
+
 DECLARE_UVERBS_ACTIONS(
 	uverbs_actions_comp_channel,
 	ADD_UVERBS_ACTION_PTR(UVERBS_COMP_CHANNEL_CREATE, &uverbs_action_create_comp_channel),
@@ -707,6 +928,13 @@ DECLARE_UVERBS_ACTIONS(
 	ADD_UVERBS_ACTION_PTR(UVERBS_CQ_CREATE, &uverbs_action_create_cq),
 );
 EXPORT_SYMBOL(uverbs_actions_cq);
+
+DECLARE_UVERBS_ACTIONS(
+	uverbs_actions_qp,
+	ADD_UVERBS_ACTION_PTR(UVERBS_QP_CREATE, &uverbs_action_create_qp),
+	ADD_UVERBS_ACTION_PTR(UVERBS_QP_CREATE_XRC_TGT, &uverbs_action_create_qp_xrc_tgt),
+);
+EXPORT_SYMBOL(uverbs_actions_qp);
 
 DECLARE_UVERBS_ACTIONS(
 	uverbs_actions_mr,
@@ -743,6 +971,13 @@ DECLARE_UVERBS_TYPE(uverbs_type_cq,
 					      uverbs_free_cq),
 		    &uverbs_actions_cq);
 EXPORT_SYMBOL(uverbs_type_cq);
+
+DECLARE_UVERBS_TYPE(uverbs_type_qp,
+		    /* 1 is used in order to free the MR after all the MWs */
+		    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_uqp_object), 0,
+					      uverbs_free_qp),
+		    &uverbs_actions_qp);
+EXPORT_SYMBOL(uverbs_type_qp);
 
 DECLARE_UVERBS_TYPE(uverbs_type_mr,
 		    /* 1 is used in order to free the MR after all the MWs */
