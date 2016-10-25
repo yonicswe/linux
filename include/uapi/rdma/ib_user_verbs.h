@@ -645,6 +645,13 @@ struct ib_uverbs_qp_dest {
 	__u8  port_num;
 };
 
+struct ib_uverbs_qp_alt_path {
+	struct ib_uverbs_qp_dest dest;
+	__u16 pkey_index;
+	__u8  port_num;
+	__u8  timeout;
+};
+
 struct ib_uverbs_query_qp {
 	__u64 response;
 	__u32 qp_handle;

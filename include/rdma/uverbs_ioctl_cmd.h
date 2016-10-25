@@ -144,6 +144,30 @@ enum uverbs_create_qp_xrc_tgt_cmd_attr {
 	CREATE_QP_XRC_TGT_RESP
 };
 
+enum uverbs_modify_qp_cmd_attr {
+	MODIFY_QP_HANDLE,
+	MODIFY_QP_STATE,
+	MODIFY_QP_CUR_STATE,
+	MODIFY_QP_EN_SQD_ASYNC_NOTIFY,
+	MODIFY_QP_ACCESS_FLAGS,
+	MODIFY_QP_PKEY_INDEX,
+	MODIFY_QP_PORT,
+	MODIFY_QP_QKEY,
+	MODIFY_QP_AV,
+	MODIFY_QP_PATH_MTU,
+	MODIFY_QP_TIMEOUT,
+	MODIFY_QP_RETRY_CNT,
+	MODIFY_QP_RNR_RETRY,
+	MODIFY_QP_RQ_PSN,
+	MODIFY_QP_MAX_RD_ATOMIC,
+	MODIFY_QP_ALT_PATH,
+	MODIFY_QP_MIN_RNR_TIMER,
+	MODIFY_QP_SQ_PSN,
+	MODIFY_QP_MAX_DEST_RD_ATOMIC,
+	MODIFY_QP_PATH_MIG_STATE,
+	MODIFY_QP_DEST_QPN
+};
+
 enum uverbs_create_comp_channel_cmd_attr {
 	CREATE_COMP_CHANNEL_FD,
 };
@@ -236,6 +260,12 @@ int uverbs_create_qp_xrc_tgt_handler(struct ib_device *ib_dev,
 				     struct uverbs_attr_array *vendor,
 				     void *priv);
 
+int uverbs_modify_qp_handler(struct ib_device *ib_dev,
+			     struct ib_ucontext *ucontext,
+			     struct uverbs_attr_array *common,
+			     struct uverbs_attr_array *vendor,
+			     void *priv);
+
 extern const struct uverbs_action uverbs_action_get_context;
 extern const struct uverbs_action uverbs_action_create_cq;
 extern const struct uverbs_action uverbs_action_create_comp_channel;
@@ -245,6 +275,7 @@ extern const struct uverbs_action uverbs_action_reg_mr;
 extern const struct uverbs_action uverbs_action_dereg_mr;
 extern const struct uverbs_action uverbs_action_create_qp;
 extern const struct uverbs_action uverbs_action_create_qp_xrc_tgt;
+extern const struct uverbs_action uverbs_action_modify_qp;
 
 enum uverbs_actions_mr_ops {
 	UVERBS_MR_REG,
@@ -268,6 +299,7 @@ extern const struct uverbs_type_actions_group uverbs_actions_cq;
 enum uverbs_actions_qp_ops {
 	UVERBS_QP_CREATE,
 	UVERBS_QP_CREATE_XRC_TGT,
+	UVERBS_QP_MODIFY,
 };
 
 extern const struct uverbs_type_actions_group uverbs_actions_qp;
