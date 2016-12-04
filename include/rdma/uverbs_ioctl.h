@@ -370,4 +370,13 @@ int ib_uverbs_uobject_type_add(struct list_head	*head,
 			       uint16_t	obj_type);
 void ib_uverbs_uobject_types_remove(struct ib_device *ib_dev);
 
+struct uverbs_root_spec {
+	const struct uverbs_type_group	*types;
+	u8				group_id;
+};
+
+struct uverbs_root *uverbs_alloc_spec_tree(unsigned int num_trees,
+					   const struct uverbs_root_spec *trees);
+void uverbs_specs_free(struct uverbs_root *root);
+
 #endif
