@@ -114,11 +114,12 @@ static int uverbs_validate_attr(struct ib_device *ibdev,
 		if (spec->obj.access == UVERBS_IDR_ACCESS_NEW) {
 			u64 idr = o_attr->uobject->id;
 
-			if (!w_legacy &&
-			    put_user(idr, &o_attr->uattr->ptr_idr)) {
-				uverbs_rollback_object(o_attr->uobject,
-						       UVERBS_IDR_ACCESS_NEW);
-				return -EFAULT;
+			if (!w_legacy) {
+				if (put_user(idr, &o_attr->uattr->ptr_idr)) {
+					uverbs_rollback_object(o_attr->uobject,
+							       UVERBS_IDR_ACCESS_NEW);
+					return -EFAULT;
+				}
 			} else {
 				o_attr->uattr->ptr_idr = idr;
 			}
