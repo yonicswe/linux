@@ -196,6 +196,9 @@ struct ib_uverbs_event_file *ib_uverbs_lookup_comp_file(int fd);
 void ib_uverbs_release_ucq(struct ib_uverbs_file *file,
 			   struct ib_uverbs_event_file *ev_file,
 			   struct ib_ucq_object *uobj);
+void ib_uverbs_release_ucq_refactored(struct ib_uverbs_file *file,
+				      struct ib_uverbs_event_file *ev_file,
+				      struct ib_ucq_object *uobj);
 void ib_uverbs_release_uevent(struct ib_uverbs_file *file,
 			      struct ib_uevent_object *uobj);
 

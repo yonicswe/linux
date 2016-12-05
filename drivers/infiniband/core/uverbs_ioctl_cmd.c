@@ -121,7 +121,7 @@ void uverbs_free_cq(const struct uverbs_type_alloc_action *type_alloc_action,
 		container_of(uobject, struct ib_ucq_object, uobject);
 
 	ib_destroy_cq(cq);
-	ib_uverbs_release_ucq(uobject->context->ufile, ev_file, ucq);
+	ib_uverbs_release_ucq_refactored(uobject->context->ufile, ev_file, ucq);
 }
 EXPORT_SYMBOL(uverbs_free_cq);
 
