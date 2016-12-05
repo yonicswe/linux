@@ -304,8 +304,7 @@ err:
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_query_device_spec,
-	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_RESP, struct ib_uverbs_query_device_resp,
-			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_RESP, struct ib_uverbs_query_device_resp),
 	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_ODP, struct ib_uverbs_odp_caps),
 	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_TIMESTAMP_MASK, u64),
 	UVERBS_ATTR_PTR_OUT(QUERY_DEVICE_HCA_CORE_CLOCK, u64),
@@ -371,7 +370,8 @@ int uverbs_query_device_handler(struct ib_device *ib_dev,
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_alloc_pd_spec,
 	UVERBS_ATTR_IDR(ALLOC_PD_HANDLE, UVERBS_TYPE_PD,
-			UVERBS_IDR_ACCESS_NEW));
+			UVERBS_IDR_ACCESS_NEW,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_alloc_pd_handler(struct ib_device *ib_dev,
 			    struct ib_uverbs_file *file,
@@ -382,9 +382,6 @@ int uverbs_alloc_pd_handler(struct ib_device *ib_dev,
 	struct ib_udata uhw;
 	struct ib_uobject *uobject;
 	struct ib_pd *pd;
-
-	if (!uverbs_is_valid(common, ALLOC_PD_HANDLE))
-		return -EINVAL;
 
 	/* Temporary, only until drivers get the new uverbs_attr_array */
 	create_udata(ctx, num, &uhw);
@@ -405,10 +402,14 @@ int uverbs_alloc_pd_handler(struct ib_device *ib_dev,
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_reg_mr_spec,
-	UVERBS_ATTR_IDR(REG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_IDR_ACCESS_NEW),
-	UVERBS_ATTR_IDR(REG_MR_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ),
-	UVERBS_ATTR_PTR_IN(REG_MR_CMD, struct ib_uverbs_ioctl_reg_mr),
-	UVERBS_ATTR_PTR_OUT(REG_MR_RESP, struct ib_uverbs_ioctl_reg_mr_resp));
+	UVERBS_ATTR_IDR(REG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_IDR_ACCESS_NEW,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(REG_MR_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_IN(REG_MR_CMD, struct ib_uverbs_ioctl_reg_mr,
+			   UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_OUT(REG_MR_RESP, struct ib_uverbs_ioctl_reg_mr_resp,
+			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_reg_mr_handler(struct ib_device *ib_dev,
 			  struct ib_uverbs_file *file,
@@ -422,12 +423,6 @@ int uverbs_reg_mr_handler(struct ib_device *ib_dev,
 	struct ib_pd                *pd;
 	struct ib_mr                *mr;
 	int                          ret;
-
-	if (!uverbs_is_valid(common, REG_MR_HANDLE) ||
-	    !uverbs_is_valid(common, REG_MR_PD_HANDLE) ||
-	    !uverbs_is_valid(common, REG_MR_CMD) ||
-	    !uverbs_is_valid(common, REG_MR_RESP))
-		return -EINVAL;
 
 	if (copy_from_user(&cmd, common->attrs[REG_MR_CMD].cmd_attr.ptr,
 			   sizeof(cmd)))
@@ -483,7 +478,8 @@ err:
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_dereg_mr_spec,
-	UVERBS_ATTR_IDR(DEREG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_IDR_ACCESS_DESTROY));
+	UVERBS_ATTR_IDR(DEREG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_IDR_ACCESS_DESTROY,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_dereg_mr_handler(struct ib_device *ib_dev,
 			    struct ib_uverbs_file *file,
@@ -491,9 +487,6 @@ int uverbs_dereg_mr_handler(struct ib_device *ib_dev,
 {
 	struct uverbs_attr_array *common = &ctx[0];
 	struct ib_mr             *mr;
-
-	if (!uverbs_is_valid(common, REG_MR_HANDLE))
-		return -EINVAL;
 
 	mr = common->attrs[DEREG_MR_HANDLE].obj_attr.uobject->object;
 
@@ -503,7 +496,9 @@ int uverbs_dereg_mr_handler(struct ib_device *ib_dev,
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_create_comp_channel_spec,
-	UVERBS_ATTR_FD(CREATE_COMP_CHANNEL_FD, UVERBS_TYPE_COMP_CHANNEL, UVERBS_IDR_ACCESS_NEW));
+	UVERBS_ATTR_FD(CREATE_COMP_CHANNEL_FD, UVERBS_TYPE_COMP_CHANNEL,
+		       UVERBS_IDR_ACCESS_NEW,
+		       UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_create_comp_channel_handler(struct ib_device *ib_dev,
 				       struct ib_uverbs_file *file,
@@ -534,13 +529,21 @@ int uverbs_create_comp_channel_handler(struct ib_device *ib_dev,
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_create_cq_spec,
-	UVERBS_ATTR_IDR(CREATE_CQ_HANDLE, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_NEW),
-	UVERBS_ATTR_PTR_IN(CREATE_CQ_CQE, u32),
+	UVERBS_ATTR_IDR(CREATE_CQ_HANDLE, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_NEW,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_IN(CREATE_CQ_CQE, u32,
+			   UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
 	UVERBS_ATTR_PTR_IN(CREATE_CQ_USER_HANDLE, u64),
 	UVERBS_ATTR_FD(CREATE_CQ_COMP_CHANNEL, UVERBS_TYPE_COMP_CHANNEL, UVERBS_IDR_ACCESS_READ),
-	UVERBS_ATTR_PTR_IN(CREATE_CQ_COMP_VECTOR, u32),
+	/*
+	 * Currently, COMP_VECTOR is mandatory, but that could be lifted in the
+	 * future.
+	 */
+	UVERBS_ATTR_PTR_IN(CREATE_CQ_COMP_VECTOR, u32,
+			   UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
 	UVERBS_ATTR_PTR_IN(CREATE_CQ_FLAGS, u32),
-	UVERBS_ATTR_PTR_OUT(CREATE_CQ_RESP_CQE, u32));
+	UVERBS_ATTR_PTR_OUT(CREATE_CQ_RESP_CQE, u32,
+			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_create_cq_handler(struct ib_device *ib_dev,
 			     struct ib_uverbs_file *file,
@@ -555,14 +558,6 @@ int uverbs_create_cq_handler(struct ib_device *ib_dev,
 	struct ib_cq_init_attr attr = {};
 	struct ib_cq                   *cq;
 	struct ib_uverbs_event_file    *ev_file = NULL;
-
-	/*
-	 * Currently, COMP_VECTOR is mandatory, but that could be lifted in the
-	 * future.
-	 */
-	if (!uverbs_is_valid(common, CREATE_CQ_HANDLE) ||
-	    !uverbs_is_valid(common, CREATE_CQ_RESP_CQE))
-		return -EINVAL;
 
 	ret = uverbs_copy_from(&attr.comp_vector, common, CREATE_CQ_COMP_VECTOR);
 	if (!ret)
@@ -668,15 +663,20 @@ static int qp_write_resp(const struct ib_qp_init_attr *attr,
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_create_qp_spec,
-	UVERBS_ATTR_IDR(CREATE_QP_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW),
-	UVERBS_ATTR_IDR(CREATE_QP_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ),
-	UVERBS_ATTR_IDR(CREATE_QP_SEND_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ),
-	UVERBS_ATTR_IDR(CREATE_QP_RECV_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR(CREATE_QP_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(CREATE_QP_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_IDR_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(CREATE_QP_SEND_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(CREATE_QP_RECV_CQ, UVERBS_TYPE_CQ, UVERBS_IDR_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
 	UVERBS_ATTR_IDR(CREATE_QP_SRQ, UVERBS_TYPE_SRQ, UVERBS_IDR_ACCESS_READ),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_USER_HANDLE, u64),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_CMD, struct ib_uverbs_ioctl_create_qp),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_CMD_FLAGS, u32),
-	UVERBS_ATTR_PTR_OUT(CREATE_QP_RESP, struct ib_uverbs_ioctl_create_qp_resp));
+	UVERBS_ATTR_PTR_OUT(CREATE_QP_RESP, struct ib_uverbs_ioctl_create_qp_resp,
+			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_create_qp_handler(struct ib_device *ib_dev,
 			     struct ib_uverbs_file *file,
@@ -693,13 +693,6 @@ int uverbs_create_qp_handler(struct ib_device *ib_dev,
 	struct ib_qp_init_attr attr = {};
 	struct ib_qp                   *qp;
 	struct ib_pd			*pd;
-
-	if (!uverbs_is_valid(common, CREATE_QP_HANDLE) ||
-	    !uverbs_is_valid(common, CREATE_QP_PD_HANDLE) ||
-	    !uverbs_is_valid(common, CREATE_QP_SEND_CQ) ||
-	    !uverbs_is_valid(common, CREATE_QP_RECV_CQ) ||
-	    !uverbs_is_valid(common, CREATE_QP_RESP))
-		return -EINVAL;
 
 	ret = uverbs_copy_from(&cmd, common, CREATE_QP_CMD);
 	if (ret)
@@ -765,12 +758,15 @@ int uverbs_create_qp_handler(struct ib_device *ib_dev,
 
 DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_create_qp_xrc_tgt_spec,
-	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW),
-	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_XRCD, UVERBS_TYPE_XRCD, UVERBS_IDR_ACCESS_READ),
+	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_HANDLE, UVERBS_TYPE_QP, UVERBS_IDR_ACCESS_NEW,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(CREATE_QP_XRC_TGT_XRCD, UVERBS_TYPE_XRCD, UVERBS_IDR_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_USER_HANDLE, u64),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_CMD, struct ib_uverbs_ioctl_create_qp),
 	UVERBS_ATTR_PTR_IN(CREATE_QP_XRC_TGT_CMD_FLAGS, u32),
-	UVERBS_ATTR_PTR_OUT(CREATE_QP_XRC_TGT_RESP, struct ib_uverbs_ioctl_create_qp_resp));
+	UVERBS_ATTR_PTR_OUT(CREATE_QP_XRC_TGT_RESP, struct ib_uverbs_ioctl_create_qp_resp,
+			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
 
 int uverbs_create_qp_xrc_tgt_handler(struct ib_device *ib_dev,
 				     struct ib_uverbs_file *file,
@@ -785,11 +781,6 @@ int uverbs_create_qp_xrc_tgt_handler(struct ib_device *ib_dev,
 	struct ib_uverbs_ioctl_create_qp cmd;
 	struct ib_qp_init_attr attr = {};
 	struct ib_qp                   *qp;
-
-	if (!uverbs_is_valid(common, CREATE_QP_XRC_TGT_HANDLE) ||
-	    !uverbs_is_valid(common, CREATE_QP_XRC_TGT_XRCD) ||
-	    !uverbs_is_valid(common, CREATE_QP_XRC_TGT_RESP))
-		return -EINVAL;
 
 	ret = uverbs_copy_from(&cmd, common, CREATE_QP_XRC_TGT_CMD);
 	if (ret)

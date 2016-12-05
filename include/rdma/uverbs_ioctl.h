@@ -165,16 +165,16 @@ struct uverbs_root {
 		 .obj = {.obj_type = _idr_type,				\
 			 .access = _access				\
 		 }, ##__VA_ARGS__ }
-#define UVERBS_ATTR_FD(_id, _fd_type, _access)				\
+#define UVERBS_ATTR_FD(_id, _fd_type, _access, ...)			\
 	[_id] = {.type = UVERBS_ATTR_TYPE_FD,				\
 		 .obj = {.obj_type = _fd_type,				\
 			 .access = _access + BUILD_BUG_ON_ZERO(		\
 				_access != UVERBS_IDR_ACCESS_NEW &&	\
 				_access != UVERBS_IDR_ACCESS_READ)	\
-		 } }
-#define UVERBS_ATTR_FLAG(_id, _mask)					\
+		 }, ##__VA_ARGS__ }
+#define UVERBS_ATTR_FLAG(_id, _mask, ...)				\
 	[_id] = {.type = UVERBS_ATTR_TYPE_FLAG,				\
-		 .flag = {.mask = _mask} }
+		 .flag = {.mask = _mask}, ##__VA_ARGS__ }
 #define _UVERBS_ATTR_SPEC_SZ(...)					\
 	(sizeof((const struct uverbs_attr_spec[]){__VA_ARGS__}) /	\
 	 sizeof(const struct uverbs_attr_spec))
