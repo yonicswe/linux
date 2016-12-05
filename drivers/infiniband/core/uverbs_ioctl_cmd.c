@@ -521,6 +521,7 @@ int uverbs_create_comp_channel_handler(struct ib_device *ib_dev,
 	INIT_LIST_HEAD(&ev_file->event_list);
 	init_waitqueue_head(&ev_file->poll_wait);
 	ev_file->async_queue = NULL;
+	ev_file->uverbs_file = file;
 	ev_file->is_closed   = 0;
 
 	/*
