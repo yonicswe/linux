@@ -146,6 +146,8 @@ static size_t get_attrs_from_trees(const struct uverbs_action **action_arr,
 			unsigned int num_single_attr_trees = 0;
 			unsigned int num_attr_trees = 0;
 			struct uverbs_attr_spec *allocated_attr;
+			enum uverbs_attr_type cur_type = UVERBS_ATTR_TYPE_NA;
+			unsigned int attr_type_idx = 0;
 
 			for (tree_idx = 0; tree_idx < num_attr_group_trees;
 			     tree_idx++) {
@@ -180,18 +182,44 @@ static size_t get_attrs_from_trees(const struct uverbs_action **action_arr,
 				}
 			}
 
-			switch (single_attr_trees[0]->type) {
+			for (i = 0; i < num_single_attr_trees; i++)
+				switch (cur_type) {
+				case UVERBS_ATTR_TYPE_NA:
+					cur_type = single_attr_trees[i]->type;
+					attr_type_idx = i;
+					continue;
+				case UVERBS_ATTR_TYPE_PTR_IN:
+				case UVERBS_ATTR_TYPE_PTR_OUT:
+				case UVERBS_ATTR_TYPE_IDR:
+				case UVERBS_ATTR_TYPE_FD:
+					if (single_attr_trees[i]->type !=
+					    UVERBS_ATTR_TYPE_NA)
+						WARN("%s\n", "uverbs_merge: Two types for the same attribute");
+					break;
+				case UVERBS_ATTR_TYPE_FLAG:
+					if (single_attr_trees[i]->type !=
+					    UVERBS_ATTR_TYPE_FLAG &&
+					    single_attr_trees[i]->type !=
+					    UVERBS_ATTR_TYPE_NA)
+						WARN("%s\n", "uverbs_merge: Two types for the same attribute");
+					break;
+				default:
+					WARN("%s\n", "uverbs_merge: Unknown attribute type given");
+				}
+
+			switch (cur_type) {
 			case UVERBS_ATTR_TYPE_PTR_IN:
 			case UVERBS_ATTR_TYPE_PTR_OUT:
 			case UVERBS_ATTR_TYPE_IDR:
 			case UVERBS_ATTR_TYPE_FD:
 				/* PTR_IN and PTR_OUT can't be merged between trees */
-				memcpy(allocated_attr, single_attr_trees[0],
+				memcpy(allocated_attr,
+				       single_attr_trees[attr_type_idx],
 				       sizeof(*allocated_attr));
 				break;
 			case UVERBS_ATTR_TYPE_FLAG:
 				allocated_attr->type =
-					single_attr_trees[0]->type;
+					UVERBS_ATTR_TYPE_FLAG;
 				allocated_attr->flags = 0;
 				allocated_attr->flag.mask = 0;
 				for (i = 0; i < num_single_attr_trees; i++) {
@@ -271,7 +299,7 @@ static int get_actions_from_trees(const struct uverbs_type **type_arr,
 	struct uverbs_action_group  *action_groups[num_groups];
 	unsigned int max_action_groups = 0;
 	struct uverbs_action_group **allocated_type_actions_group = NULL;
-	unsigned int i;
+	int i;
 
 	for (group_idx = 0; group_idx < num_groups; group_idx++) {
 		const struct uverbs_action_group *actions_group_trees[elements];
@@ -338,10 +366,19 @@ static int get_actions_from_trees(const struct uverbs_type **type_arr,
 						   GFP_KERNEL);
 			if (!allocated_action)
 				goto free_list;
-			allocated_action->action.flags =
-				single_action_trees[0]->flags;
-			allocated_action->action.handler =
-				single_action_trees[0]->handler;
+
+			/* Take the last tree which is parameter != NULL */
+			for (i = num_single_action_trees - 1;
+			     i >= 0 && !single_action_trees[i]->handler; i--);
+			if (WARN_ON(i < 0)) {
+				allocated_action->action.flags = 0;
+				allocated_action->action.handler = NULL;
+			} else {
+				allocated_action->action.flags =
+					single_action_trees[i]->flags;
+				allocated_action->action.handler =
+					single_action_trees[i]->handler;
+			}
 			allocated_action->action.num_child_attrs = 0;
 
 			ret = get_attrs_from_trees(single_action_trees,
@@ -461,7 +498,7 @@ struct uverbs_root *uverbs_alloc_spec_tree(unsigned int num_trees,
 	struct uverbs_type_group *types_groups[num_groups];
 	unsigned int max_types_groups = 0;
 	struct uverbs_root *allocated_types_group = NULL;
-	unsigned int i;
+	int i;
 
 	memset(types_groups, 0, sizeof(*types_groups));
 
@@ -536,8 +573,13 @@ struct uverbs_root *uverbs_alloc_spec_tree(unsigned int num_trees,
 			if (!allocated_type)
 				goto free_list;
 
-			/* We always take the first parameter alloc arg */
-			allocated_type->type.alloc = curr_type[0]->alloc;
+			/* Take the last tree which is parameter != NULL */
+			for (i = trees_for_curr_type - 1;
+			     i >= 0 && !curr_type[i]->alloc; i--);
+			if (i < 0)
+				allocated_type->type.alloc = NULL;
+			else
+				allocated_type->type.alloc = curr_type[i]->alloc;
 
 			res = get_actions_from_trees(curr_type,
 						     trees_for_curr_type,
