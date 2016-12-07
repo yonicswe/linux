@@ -399,7 +399,6 @@ static void ib_uverbs_remove_fd(struct ib_uobject *uobject)
 	 */
 	if (uobject->context) {
 		list_del(&uobject->list);
-		uobject->type->free_fn(uobject->type, uobject);
 		kref_put(&uobject->context->ufile->ref, ib_uverbs_release_file);
 		uobject->context = NULL;
 	}
@@ -410,11 +409,7 @@ void ib_uverbs_close_fd(struct file *f)
 	struct ib_uobject *uobject = f->private_data - sizeof(struct ib_uobject);
 
 	mutex_lock(&uobject->uobjects_lock->lock);
-	if (uobject->context) {
-		list_del(&uobject->list);
-		kref_put(&uobject->context->ufile->ref, ib_uverbs_release_file);
-		uobject->context = NULL;
-	}
+	ib_uverbs_remove_fd(uobject);
 	mutex_unlock(&uobject->uobjects_lock->lock);
 	kref_put(&uobject->uobjects_lock->ref, release_uobjects_list_lock);
 }
@@ -496,10 +491,13 @@ void ib_uverbs_uobject_type_cleanup_ucontext(struct ib_ucontext *ucontext,
 		list_for_each_entry_safe(obj, next_obj, &ucontext->uobjects,
 					 list)
 			if (obj->type->order == i) {
-				if (obj->type->type == UVERBS_ATTR_TYPE_IDR)
+				if (obj->type->type == UVERBS_ATTR_TYPE_IDR) {
+					obj->type->free_fn(obj->type, obj);
 					ib_uverbs_uobject_remove(obj, false);
-				else
+				} else {
+					obj->type->free_fn(obj->type, obj);
 					ib_uverbs_remove_fd(obj);
+				}
 			}
 		mutex_unlock(&ucontext->uobjects_lock->lock);
 	}
