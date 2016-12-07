@@ -57,6 +57,8 @@ struct ib_uobject *uverbs_get_type_from_fd(const struct uverbs_type_alloc_action
 					   int fd);
 void uverbs_rollback_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access);
+void uverbs_commit_object(struct ib_uobject *uobj,
+				 enum uverbs_idr_access access);
 void uverbs_commit_objects(struct uverbs_attr_array *attr_array,
 			   size_t num,
 			   const struct uverbs_action *action,

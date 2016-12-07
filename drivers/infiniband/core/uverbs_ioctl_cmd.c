@@ -1011,6 +1011,11 @@ DECLARE_UVERBS_TYPE(uverbs_type_qp,
 					  &uverbs_uhw_compat_spec)),
 );
 
+DECLARE_UVERBS_TYPE(uverbs_type_mw,
+		    &UVERBS_TYPE_ALLOC_IDR(1, uverbs_free_mw),
+		    /* TODO: implement actions for mw */
+		    NULL);
+
 DECLARE_UVERBS_TYPE(uverbs_type_mr,
 		    /* 1 is used in order to free the MR after all the MWs */
 		    &UVERBS_TYPE_ALLOC_IDR(1, uverbs_free_mr),
@@ -1021,6 +1026,39 @@ DECLARE_UVERBS_TYPE(uverbs_type_mr,
 			ADD_UVERBS_ACTION(UVERBS_MR_DEREG,
 					  uverbs_dereg_mr_handler,
 					  &uverbs_dereg_mr_spec)));
+DECLARE_UVERBS_TYPE(uverbs_type_srq,
+		    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_usrq_object), 0,
+					      uverbs_free_srq),
+		    /* TODO: implement actions for srq */
+		    NULL);
+
+DECLARE_UVERBS_TYPE(uverbs_type_ah,
+		    &UVERBS_TYPE_ALLOC_IDR(0, uverbs_free_ah),
+		    /* TODO: implement actions for ah */
+		    NULL);
+
+DECLARE_UVERBS_TYPE(uverbs_type_flow,
+		    &UVERBS_TYPE_ALLOC_IDR(0, uverbs_free_flow),
+		    /* TODO: implement actions for flow */
+		    NULL);
+
+
+DECLARE_UVERBS_TYPE(uverbs_type_wq,
+		    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_uwq_object), 0,
+					      uverbs_free_wq),
+		    /* TODO: implement actions for wq */
+		    NULL);
+
+DECLARE_UVERBS_TYPE(uverbs_type_rwq_ind_table,
+		    &UVERBS_TYPE_ALLOC_IDR(0, uverbs_free_rwq_ind_tbl),
+		    /* TODO: implement actions for rwq_ind_table */
+		    NULL);
+
+DECLARE_UVERBS_TYPE(uverbs_type_xrcd,
+		    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_uxrcd_object), 0,
+					      uverbs_free_xrcd),
+		    /* TODO: implement actions for xrcd */
+		    NULL);
 
 DECLARE_UVERBS_TYPE(uverbs_type_pd,
 		    /* 2 is used in order to free the PD after all objects */

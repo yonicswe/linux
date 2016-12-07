@@ -368,9 +368,9 @@ static void uverbs_commit_fd(struct ib_uobject *uobj,
 	}
 }
 
-static void uverbs_commit_object(struct ib_uobject *uobj,
-				 enum uverbs_idr_access access,
-				 bool success)
+static void _uverbs_commit_object(struct ib_uobject *uobj,
+				  enum uverbs_idr_access access,
+				  bool success)
 {
 	if (uobj->type->type == UVERBS_ATTR_TYPE_IDR)
 		uverbs_commit_idr(uobj, access, success);
@@ -380,10 +380,16 @@ static void uverbs_commit_object(struct ib_uobject *uobj,
 		WARN_ON(true);
 }
 
+void uverbs_commit_object(struct ib_uobject *uobj,
+			  enum uverbs_idr_access access)
+{
+	return _uverbs_commit_object(uobj, access, true);
+}
+
 void uverbs_rollback_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access)
 {
-	return uverbs_commit_object(uobj, access, false);
+	return _uverbs_commit_object(uobj, access, false);
 }
 
 static void ib_uverbs_remove_fd(struct ib_uobject *uobject)
@@ -447,8 +453,8 @@ void uverbs_commit_objects(struct uverbs_attr_array *attr_array,
 				 * refcounts should be handled at the object
 				 * level and not at the uobject level.
 				 */
-				uverbs_commit_object(attr->obj_attr.uobject,
-						     spec->obj.access, success);
+				_uverbs_commit_object(attr->obj_attr.uobject,
+						      spec->obj.access, success);
 		}
 	}
 }

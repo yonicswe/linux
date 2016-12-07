@@ -248,9 +248,16 @@ extern const struct uverbs_action_group uverbs_actions_device;
 
 extern const struct uverbs_type uverbs_type_cq;
 extern const struct uverbs_type uverbs_type_qp;
+extern const struct uverbs_type uverbs_type_rwq_ind_table;
+extern const struct uverbs_type uverbs_type_wq;
+extern const struct uverbs_type uverbs_type_srq;
+extern const struct uverbs_type uverbs_type_ah;
+extern const struct uverbs_type uverbs_type_flow;
 extern const struct uverbs_type uverbs_type_comp_channel;
 extern const struct uverbs_type uverbs_type_mr;
+extern const struct uverbs_type uverbs_type_mw;
 extern const struct uverbs_type uverbs_type_pd;
+extern const struct uverbs_type uverbs_type_xrcd;
 extern const struct uverbs_type uverbs_type_device;
 
 extern const struct uverbs_type_group uverbs_common_types;
