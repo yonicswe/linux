@@ -1144,8 +1144,10 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
 			goto err;
 		}
 		ev_file = uverbs_fd_to_priv(ev_uobj);
+		kref_get(&ev_file->ref);
 	}
 
+	obj->uobject.user_handle = cmd->user_handle;
 	obj->uverbs_file	   = file;
 	obj->comp_events_reported  = 0;
 	obj->async_events_reported = 0;
@@ -1528,6 +1530,7 @@ static int create_qp(struct ib_uverbs_file *file,
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
 	obj->uxrcd = NULL;
+	obj->uevent.uobject.user_handle = cmd->user_handle;
 
 	if (cmd_sz >= offsetof(typeof(*cmd), rwq_ind_tbl_handle) +
 		      sizeof(cmd->rwq_ind_tbl_handle) &&
@@ -3566,6 +3569,7 @@ static int __uverbs_create_xsrq(struct ib_uverbs_file *file,
 	atomic_set(&srq->usecnt, 0);
 
 	obj->uevent.uobject.object = srq;
+	obj->uevent.uobject.user_handle = cmd->user_handle;
 
 	memset(&resp, 0, sizeof resp);
 	resp.srq_handle = obj->uevent.uobject.id;
