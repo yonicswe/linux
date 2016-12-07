@@ -308,7 +308,6 @@ static void ib_uverbs_uobject_remove(struct ib_uobject *uobject, bool lock)
 	 * another thread will use our object.
 	 */
 	remove_uobj(uobject);
-	uobject->type->free_fn(uobject->type, uobject);
 	if (lock)
 		mutex_lock(&uobject->context->uobjects_lock->lock);
 	list_del(&uobject->list);
