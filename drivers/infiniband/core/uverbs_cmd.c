@@ -1469,11 +1469,11 @@ ssize_t ib_uverbs_destroy_cq(struct ib_uverbs_file *file,
 
 	ret = ib_destroy_cq(cq);
 	if (ret) {
-		uverbs_rollback_object(cq->uobject, UVERBS_IDR_ACCESS_DESTROY);
+		uverbs_rollback_object(uobj, UVERBS_IDR_ACCESS_DESTROY);
 		return ret;
 	}
 
-	uverbs_commit_object(cq->uobject, UVERBS_IDR_ACCESS_DESTROY);
+	uverbs_commit_object(uobj, UVERBS_IDR_ACCESS_DESTROY);
 
 	memset(&resp, 0, sizeof resp);
 	resp.comp_events_reported  = obj->comp_events_reported;
