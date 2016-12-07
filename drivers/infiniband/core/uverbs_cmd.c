@@ -1068,7 +1068,7 @@ ssize_t ib_uverbs_create_comp_channel(struct ib_uverbs_file *file,
 	struct ib_uverbs_create_comp_channel	   cmd;
 	struct ib_uverbs_create_comp_channel_resp  resp;
 	struct ib_uobject			  *uobj;
-	struct file				  *filp;
+	struct ib_uverbs_event_file		  *ev_file;
 
 	if (out_len < sizeof resp)
 		return -ENOSPC;
@@ -1084,7 +1084,14 @@ ssize_t ib_uverbs_create_comp_channel(struct ib_uverbs_file *file,
 
 	resp.fd = uobj->id;
 
-	filp = uverbs_fd_to_priv(uobj);
+	ev_file = uverbs_fd_to_priv(uobj);
+	kref_init(&ev_file->ref);
+	spin_lock_init(&ev_file->lock);
+	INIT_LIST_HEAD(&ev_file->event_list);
+	init_waitqueue_head(&ev_file->poll_wait);
+	ev_file->async_queue = NULL;
+	ev_file->uverbs_file = file;
+	ev_file->is_closed   = 0;
 
 	if (copy_to_user((void __user *) (unsigned long) cmd.response,
 			 &resp, sizeof resp)) {
