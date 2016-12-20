@@ -54,8 +54,22 @@ struct ib_uobject *uverbs_get_uobject_from_context(const struct uverbs_type_allo
 						   enum uverbs_idr_access access,
 						   unsigned int id);
 
+/* Check if the object is still alive. This must be either called within RCU */
+bool uverbs_is_live(struct ib_uobject *uobj);
 void uverbs_finalize_object(struct ib_uobject *uobj,
 			    enum uverbs_idr_access access,
 			    bool success);
+/*
+ * Indicate this fd is no longer used by this consumer, but its memory isn't
+ * released yet. The memory is released only when ib_uverbs_cleanup_fd is
+ * called.
+ */
+void ib_uverbs_close_fd(struct file *f);
+void ib_uverbs_cleanup_fd(void *private_data);
+
+static inline void *uverbs_fd_uobj_to_priv(struct ib_uobject *uobj)
+{
+	return uobj + 1;
+}
 
 #endif /* RDMA_CORE_H */
