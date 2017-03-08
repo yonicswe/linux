@@ -93,6 +93,13 @@ enum uverbs_destroy_cq_cmd_attr_ids {
 	DESTROY_CQ_RESP
 };
 
+enum uverbs_query_qp_cmd_attr_ids {
+	QUERY_QP_HANDLE,
+	QUERY_QP_ATTR_MASK,
+	QUERY_QP_RESP,
+	QUERY_QP_RESERVED
+};
+
 enum uverbs_create_qp_xrc_tgt_cmd_attr_ids {
 	CREATE_QP_XRC_TGT_HANDLE,
 	CREATE_QP_XRC_TGT_XRCD,
@@ -192,6 +199,7 @@ enum uverbs_actions_qp_ops {
 	UVERBS_QP_CREATE_XRC_TGT,
 	UVERBS_QP_MODIFY,
 	UVERBS_QP_DESTROY,
+	UVERBS_QP_QUERY,
 };
 
 extern const struct uverbs_action_group uverbs_actions_qp;
