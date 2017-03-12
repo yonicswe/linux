@@ -574,6 +574,78 @@ err:
 }
 
 DECLARE_UVERBS_ATTR_SPEC(
+	uverbs_rereg_mr_spec,
+	UVERBS_ATTR_IDR(REREG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_IDR(REREG_MR_PD_HANDLE, UVERBS_TYPE_PD, UVERBS_ACCESS_READ,
+			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_IN(REREG_MR_CMD, struct ib_uverbs_rereg_mr,
+			   UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)),
+	UVERBS_ATTR_PTR_OUT(REG_MR_RESP, struct ib_uverbs_rereg_mr_resp,
+			    UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
+
+int uverbs_rereg_mr_handler(struct ib_device *ib_dev,
+			    struct ib_uverbs_file *file,
+			    struct uverbs_attr_array *ctx, size_t num)
+{
+	struct uverbs_attr_array *common = &ctx[0];
+
+	struct ib_udata                 udata;
+	struct ib_uverbs_rereg_mr       cmd;
+	struct ib_uverbs_rereg_mr_resp  resp;
+	struct ib_mr                    *mr;
+	struct ib_pd                    *pd = NULL;
+	struct ib_pd                    *old_pd;
+	int                             ret;
+
+	if (uverbs_copy_from(&cmd, common, REREG_MR_CMD))
+		return -EFAULT;
+
+	if (cmd.flags & ~IB_MR_REREG_SUPPORTED || !cmd.flags)
+		return -EINVAL;
+
+	if ((cmd.flags & IB_MR_REREG_TRANS) &&
+	    (!cmd.start || !cmd.hca_va || 0 >= cmd.length ||
+	     (cmd.start & ~PAGE_MASK) != (cmd.hca_va & ~PAGE_MASK)))
+		return -EINVAL;
+
+	INIT_UDATA(&udata, &cmd, &resp,
+		   sizeof(struct ib_uverbs_rereg_mr),
+		   sizeof(struct ib_uverbs_rereg_mr_resp));
+
+	mr = common->attrs[REREG_MR_HANDLE].obj_attr.uobject->object;
+	pd = common->attrs[REREG_MR_PD_HANDLE].obj_attr.uobject->object;
+
+	if (cmd.flags & IB_MR_REREG_ACCESS) {
+		ret = ib_check_mr_access(cmd.access_flags);
+		if (ret)
+			return -EFAULT;
+	}
+
+	old_pd = mr->pd;
+	ret = mr->device->rereg_user_mr(mr, cmd.flags, cmd.start,
+					cmd.length, cmd.hca_va,
+					cmd.access_flags, pd, &udata);
+	if (!ret) {
+		if (cmd.flags & IB_MR_REREG_PD) {
+			atomic_inc(&pd->usecnt);
+			mr->pd = pd;
+			atomic_dec(&old_pd->usecnt);
+		}
+	} else
+		return -EFAULT;
+
+	memset(&resp, 0, sizeof(resp));
+	resp.lkey      = mr->lkey;
+	resp.rkey      = mr->rkey;
+
+	if (uverbs_copy_to(common, REREG_MR_RESP, &resp))
+		return -EFAULT;
+
+	return 0;
+}
+
+DECLARE_UVERBS_ATTR_SPEC(
 	uverbs_dereg_mr_spec,
 	UVERBS_ATTR_IDR(DEREG_MR_HANDLE, UVERBS_TYPE_MR, UVERBS_ACCESS_DESTROY,
 			UA_FLAGS(UVERBS_ATTR_SPEC_F_MANDATORY)));
@@ -1270,7 +1342,10 @@ DECLARE_UVERBS_TYPE(uverbs_type_mr,
 					  &uverbs_uhw_compat_spec),
 			ADD_UVERBS_ACTION(UVERBS_MR_DEREG,
 					  uverbs_dereg_mr_handler,
-					  &uverbs_dereg_mr_spec)));
+					  &uverbs_dereg_mr_spec),
+			ADD_UVERBS_ACTION(UVERBS_MR_REREG,
+					  uverbs_rereg_mr_handler,
+					  &uverbs_rereg_mr_spec)));
 
 DECLARE_UVERBS_TYPE(uverbs_type_srq,
 		    &UVERBS_TYPE_ALLOC_IDR_SZ(sizeof(struct ib_usrq_object), 0,

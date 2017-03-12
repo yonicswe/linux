@@ -170,6 +170,13 @@ enum uverbs_reg_mr_cmd_attr_ids {
 	REG_MR_RESP
 };
 
+enum uverbs_rereg_mr_cmd_attr_ids {
+	REREG_MR_HANDLE,
+	REREG_MR_PD_HANDLE,
+	REREG_MR_CMD,
+	REREG_MR_RESP
+};
+
 enum uverbs_dereg_mr_cmd_attr_ids {
 	DEREG_MR_HANDLE,
 };
@@ -177,6 +184,7 @@ enum uverbs_dereg_mr_cmd_attr_ids {
 enum uverbs_actions_mr_ops {
 	UVERBS_MR_REG,
 	UVERBS_MR_DEREG,
+	UVERBS_MR_REREG,
 };
 
 extern const struct uverbs_action_group uverbs_actions_mr;
